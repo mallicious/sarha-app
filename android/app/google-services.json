@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "800299268258",
+    "project_id": "sarha-hazard-assist",
+    "storage_bucket": "sarha-hazard-assist.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:800299268258:android:0fba521db52c5322bf7ffb",
+        "android_client_info": {
+          "package_name": "com.malvina.sarha_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKuWmTbi-WFYpRUQYetopF9nusqXOQA6I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
