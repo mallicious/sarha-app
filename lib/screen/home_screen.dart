@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'map_detectionscreen.dart';
+import 'unified_detection_screen.dart';
 import 'manual_reportscreen.dart';
 import 'AR_hazardscreen.dart';
 import 'settings_screen.dart';
-import 'user_type_selection_screen.dart'; // Redirect back here on logout
+import 'user_type_selection_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,6 +18,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // === CALM COLOR PALETTE ===
+  static const Color softLavender = Color(0xFFA7B5F4);
+  static const Color coral = Color(0xFFFF9B85);
+  static const Color cream = Color(0xFFFAF8F5);
+  static const Color deepPurple = Color(0xFF4A4063);
+  static const Color lightPurple = Color(0xFFD1D5F7);
+
   LatLng? _location;
   int _currentIndex = 0;
 
@@ -38,180 +46,598 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       debugPrint("Geocoding Error: $e");
       setState(() {
-        _location = const LatLng(9.0765, 7.3986); 
+        _location = const LatLng(9.0765, 7.3986);
       });
     }
   }
 
   void _onTabTapped(int index) {
+    if (index == 0) return;
+
     setState(() {
       _currentIndex = index;
     });
 
     switch (index) {
       case 1:
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const MapDetectionScreen()));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const UnifiedDetectionScreen()),
+        ).then((_) => setState(() => _currentIndex = 0));
         break;
       case 2:
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const ManualReportScreen()));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ManualReportScreen()),
+        ).then((_) => setState(() => _currentIndex = 0));
         break;
       case 3:
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const ARHazardScreen()));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ARHazardScreen()),
+        ).then((_) => setState(() => _currentIndex = 0));
         break;
+    }
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('stayLoggedIn');
+    await prefs.remove('loginTimestamp');
+    await prefs.remove('userType');
+    
+    await FirebaseAuth.instance.signOut();
+    
+    if (context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const UserTypeSelectionScreen()),
+        (route) => false,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final name = user?.email?.split('@').first ?? "SARHA User";
+    final name = user?.displayName ?? user?.email?.split('@').first ?? "Driver";
 
     return Scaffold(
-      backgroundColor: const Color(0xFF9FADF4), 
-      appBar: AppBar(
-        title: const Text(
-          'SARHA', 
-          style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)
-        ),
-        backgroundColor: const Color(0xFF217C82), 
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                // Clear stack and go back to user selection
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const UserTypeSelectionScreen()),
-                  (route) => false,
-                );
-              }
-            },
-          )
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hello, $name',
-                style: const TextStyle(
-                  fontSize: 30, 
-                  fontWeight: FontWeight.w900, 
-                  color: Color(0xFF073D3E),
+      backgroundColor: cream,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 180,
+            floating: false,
+            pinned: true,
+            backgroundColor: softLavender,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [softLavender, lightPurple],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                name[0].toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: deepPurple,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Hello, $name! 👋',
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: deepPurple,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Drive safe. Detect hazards early.',
+                                    style: TextStyle(
+                                      color: deepPurple.withOpacity(0.7),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Drive safe. Detect hazards early.',
-                style: TextStyle(
-                  color: Color(0xFF5E213E), 
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.settings_rounded, color: deepPurple),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
                 ),
               ),
-              const SizedBox(height: 30),
-              _statsCard(),
-              const SizedBox(height: 35),
-              const Text(
-                'Abuja Hazards Map',
-                style: TextStyle(
-                  fontSize: 20, 
-                  fontWeight: FontWeight.w800, 
-                  color: Color(0xFF073D3E)
-                ),
+              IconButton(
+                icon: Icon(Icons.logout_rounded, color: deepPurple),
+                onPressed: _logout,
               ),
-              const SizedBox(height: 12),
-              _mapPreview(),
             ],
           ),
-        ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFFFFB589), 
-        unselectedItemColor: const Color(0xFF217C82), 
-        backgroundColor: const Color(0xFFDAF561), 
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Detect'),
-          BottomNavigationBarItem(icon: Icon(Icons.add_location), label: 'Report'),
-          BottomNavigationBarItem(icon: Icon(Icons.view_in_ar), label: 'AR'),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildQuickActions(),
+                  const SizedBox(height: 24),
+                  _buildStatsCard(),
+                  const SizedBox(height: 24),
+                  _buildMapSection(),
+                  const SizedBox(height: 24),
+                  _buildRecentActivity(),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
         ],
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Actions',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: deepPurple,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.explore_rounded,
+                label: 'Detect\nHazards',
+                color: coral,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const UnifiedDetectionScreen()),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.add_location_alt_rounded,
+                label: 'Report\nHazard',
+                color: softLavender,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ManualReportScreen()),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.view_in_ar_rounded,
+                label: 'AR\nView',
+                color: Colors.green[400]!,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ARHazardScreen()),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: deepPurple,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _statsCard() {
+  Widget _buildStatsCard() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9DAD6).withOpacity(0.8), 
+        gradient: LinearGradient(
+          colors: [softLavender.withOpacity(0.3), lightPurple.withOpacity(0.3)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF217C82), width: 1.5),
+        border: Border.all(color: softLavender.withOpacity(0.3), width: 1),
       ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Stat(icon: Icons.warning, label: 'Hazards', value: '450'),
-          _Stat(icon: Icons.person, label: 'Reported', value: '12'),
-          _Stat(icon: Icons.route, label: 'Distance', value: '85 km'),
+          Row(
+            children: [
+              Icon(Icons.analytics_rounded, color: deepPurple, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'Your Stats Today',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: deepPurple,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem(
+                  icon: Icons.warning_rounded,
+                  label: 'Hazards Nearby',
+                  value: '450',
+                  color: coral,
+                ),
+              ),
+              Expanded(
+                child: _buildStatItem(
+                  icon: Icons.report_rounded,
+                  label: 'Your Reports',
+                  value: '12',
+                  color: Colors.green[400]!,
+                ),
+              ),
+              Expanded(
+                child: _buildStatItem(
+                  icon: Icons.route_rounded,
+                  label: 'Distance',
+                  value: '85km',
+                  color: softLavender,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _mapPreview() {
+  Widget _buildStatItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: deepPurple,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            color: deepPurple.withOpacity(0.6),
+            height: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMapSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Abuja Hazards Map',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: deepPurple,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UnifiedDetectionScreen()),
+              ),
+              icon: const Icon(Icons.fullscreen_rounded, size: 18),
+              label: const Text('View Full'),
+              style: TextButton.styleFrom(foregroundColor: softLavender),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _buildMapPreview(),
+      ],
+    );
+  }
+
+  Widget _buildMapPreview() {
     if (_location == null) {
-      return const SizedBox(
-        height: 220, 
-        child: Center(child: CircularProgressIndicator(color: Color(0xFF217C82)))
+      return Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Center(
+          child: CircularProgressIndicator(color: coral),
+        ),
       );
     }
+
     return Container(
-      height: 220,
+      height: 200,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF217C82), width: 3),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(21),
+        borderRadius: BorderRadius.circular(20),
         child: GoogleMap(
           initialCameraPosition: CameraPosition(target: _location!, zoom: 12),
           myLocationEnabled: true,
           zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
         ),
       ),
     );
   }
-}
 
-class _Stat extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  const _Stat({required this.icon, required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildRecentActivity() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFFFFB589), size: 30), 
-        const SizedBox(height: 8),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF073D3E))),
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF5E213E))),
+        Text(
+          'Recent Activity',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: deepPurple,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildActivityItem(
+          icon: Icons.check_circle_rounded,
+          title: 'Pothole Reported',
+          subtitle: 'Maitama District • 2 hours ago',
+          color: Colors.green[400]!,
+        ),
+        const SizedBox(height: 12),
+        _buildActivityItem(
+          icon: Icons.warning_rounded,
+          title: 'Hazard Detected',
+          subtitle: 'Central Area • 5 hours ago',
+          color: coral,
+        ),
+        const SizedBox(height: 12),
+        _buildActivityItem(
+          icon: Icons.route_rounded,
+          title: 'Trip Completed',
+          subtitle: '15.2 km • Yesterday',
+          color: softLavender,
+        ),
       ],
+    );
+  }
+
+  Widget _buildActivityItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: deepPurple,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: deepPurple.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: deepPurple.withOpacity(0.3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: _onTabTapped,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: coral,
+        unselectedItemColor: deepPurple.withOpacity(0.5),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        selectedFontSize: 12,
+        unselectedFontSize: 12,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.explore_rounded),
+            label: 'Detect',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.add_location_alt_rounded),
+            label: 'Report',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.view_in_ar_rounded),
+            label: 'AR',
+          ),
+        ],
+      ),
     );
   }
 }

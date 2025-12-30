@@ -1,5 +1,3 @@
-// lib/screen/manual_reportscreen.dart - SEARCH LOCATION IN GOOGLE MAPS
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -25,19 +23,16 @@ class ManualReportScreen extends StatefulWidget {
 }
 
 class _ManualReportScreenState extends State<ManualReportScreen> {
-  // === COLOR PALETTE ===
-  final Color _limeGreen = const Color(0xFFDAF561);
-  final Color _periwinkle = const Color(0xFF9FADF4);
-  final Color _deepPlum = const Color(0xFF5E213E);
-  final Color _coral = const Color(0xFFFFA589);
-  final Color _darkNavy = const Color(0xFF07303E);
-  final Color _royalBlue = const Color(0xFF3451A3);
-  final Color _palePink = const Color(0xFFF9DAD6);
-  final Color _sand = const Color(0xFFE3D0B3);
+  // === CALM COLOR PALETTE ===
+  static const Color softLavender = Color(0xFFA7B5F4);
+  static const Color coral = Color(0xFFFF9B85);
+  static const Color cream = Color(0xFFFAF8F5);
+  static const Color deepPurple = Color(0xFF4A4063);
+  static const Color lightPurple = Color(0xFFD1D5F7);
 
   final _formKey = GlobalKey<FormState>();
   final _descCtrl = TextEditingController();
-  final _addressCtrl = TextEditingController(); // NEW: For manual address input
+  final _addressCtrl = TextEditingController();
 
   HazardType? _hazardType;
   double? _latitude;
@@ -55,20 +50,17 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
     super.dispose();
   }
 
-  // ================= SEARCH ADDRESS AND GET COORDINATES =================
-
   Future<void> _searchAddress() async {
     final address = _addressCtrl.text.trim();
 
     if (address.isEmpty) {
-      _snack('Please enter an address to search', _deepPlum);
+      _snack('Please enter an address to search', coral);
       return;
     }
 
     setState(() => _loading = true);
 
     try {
-      // Convert address to coordinates using Geocoding
       List<Location> locations = await locationFromAddress(address);
 
       if (locations.isNotEmpty) {
@@ -80,47 +72,33 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
           _locationAddress = address;
         });
 
-        _snack('Location found: $address', _limeGreen);
+        _snack('Location found: $address', Colors.green);
       } else {
-        _snack('Address not found. Try different keywords.', _deepPlum);
+        _snack('Address not found. Try different keywords.', coral);
       }
     } catch (e) {
-      _snack('Could not find location. Try again.', _deepPlum);
+      _snack('Could not find location. Try again.', coral);
       debugPrint('Geocoding error: $e');
     } finally {
       setState(() => _loading = false);
     }
   }
 
-  // ================= OPEN GOOGLE MAPS FOR SEARCH =================
-
   Future<void> _openGoogleMapsSearch() async {
     try {
-      // Make search dynamic: Use address field if filled, else default to Abuja
-      final searchQuery =
-          _addressCtrl.text.isNotEmpty ? _addressCtrl.text : 'Abuja, Nigeria';
-      final url =
-          'geo:0,0?q=${Uri.encodeComponent(searchQuery)}'; // Use geo: scheme for better app launching
+      final searchQuery = _addressCtrl.text.isNotEmpty ? _addressCtrl.text : 'Abuja, Nigeria';
+      final url = 'geo:0,0?q=${Uri.encodeComponent(searchQuery)}';
       final uri = Uri.parse(url);
 
       if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication, // Prefers Maps app over browser
-        );
-
-        // Show instructions only after successful launch
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
         _showMapInstructionDialog();
       } else {
-        // More specific error message
-        _snack(
-            'Google Maps is not available on this device. Please install it or use a browser.',
-            _deepPlum);
+        _snack('Google Maps is not available on this device.', coral);
       }
     } catch (e) {
-      // Log the error for debugging
       debugPrint('Error opening Google Maps: $e');
-      _snack('Failed to open Google Maps: ${e.toString()}', _deepPlum);
+      _snack('Failed to open Google Maps: ${e.toString()}', coral);
     }
   }
 
@@ -128,57 +106,39 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
         title: Row(
           children: [
-            Icon(Icons.map, color: _royalBlue),
+            Icon(Icons.map_rounded, color: softLavender, size: 28),
             const SizedBox(width: 12),
-            const Text('Find Location'),
+            Text('Find Location', style: TextStyle(color: deepPurple, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '1. Search for the hazard location in Google Maps',
-              style: TextStyle(color: _darkNavy, fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '2. Copy the address or coordinates',
-              style: TextStyle(color: _darkNavy, fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '3. Come back and paste it in the "Address" field',
-              style: TextStyle(color: _darkNavy, fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '4. Tap "Search" button to find coordinates',
-              style: TextStyle(color: _darkNavy, fontSize: 14),
-            ),
+            _buildInstructionStep('1', 'Search for the hazard location in Google Maps'),
+            _buildInstructionStep('2', 'Copy the address or coordinates'),
+            _buildInstructionStep('3', 'Come back and paste it in the "Address" field'),
+            _buildInstructionStep('4', 'Tap "Search" button to find coordinates'),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _limeGreen.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _limeGreen),
+                color: lightPurple.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: softLavender),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.lightbulb, color: _royalBlue, size: 20),
+                  Icon(Icons.lightbulb_outline_rounded, color: coral, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Example: "16th Avenue, Gwarimpa, Abuja"',
-                      style: TextStyle(
-                        color: _darkNavy,
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                      ),
+                      style: TextStyle(color: deepPurple, fontSize: 12, fontStyle: FontStyle.italic),
                     ),
                   ),
                 ],
@@ -190,7 +150,9 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
             style: ElevatedButton.styleFrom(
-              backgroundColor: _royalBlue,
+              backgroundColor: coral,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text('Got It'),
           ),
@@ -199,14 +161,38 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
     );
   }
 
-  // ================= DETECT CURRENT LOCATION =================
+  Widget _buildInstructionStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: softLavender,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(number, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(text, style: TextStyle(color: deepPurple, fontSize: 14)),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _detectCurrentLocation() async {
     setState(() => _loading = true);
 
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
-        _snack('Please enable location services', _deepPlum);
+        _snack('Please enable location services', coral);
         setState(() => _loading = false);
         return;
       }
@@ -216,29 +202,20 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
         perm = await Geolocator.requestPermission();
       }
 
-      if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) {
-        _snack('Location permission denied', _deepPlum);
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        _snack('Location permission denied', coral);
         setState(() => _loading = false);
         return;
       }
 
-      Position pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      Position pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
 
-      // Get address from coordinates
-      List<Placemark> placemarks =
-          await placemarkFromCoordinates(pos.latitude, pos.longitude);
+      List<Placemark> placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
       String address = 'Unknown location';
 
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
-        address =
-            '${place.street ?? ''}, ${place.subLocality ?? ''}, ${place.locality ?? 'Abuja'}'
-                .trim()
-                .replaceFirst(',', '')
-                .trim();
+        address = '${place.street ?? ''}, ${place.subLocality ?? ''}, ${place.locality ?? 'Abuja'}'.trim().replaceFirst(',', '').trim();
       }
 
       setState(() {
@@ -248,24 +225,22 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
         _addressCtrl.text = address;
       });
 
-      _snack('Current location detected!', _limeGreen);
+      _snack('Current location detected!', Colors.green);
     } catch (e) {
-      _snack('Failed to get location: ${e.toString()}', _deepPlum);
+      _snack('Failed to get location: ${e.toString()}', coral);
     } finally {
       setState(() => _loading = false);
     }
   }
 
-  // ================= SUBMIT =================
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
-      _snack('Please fill in all required fields', _deepPlum);
+      _snack('Please fill in all required fields', coral);
       return;
     }
 
     if (_latitude == null || _longitude == null) {
-      _snack('Please select or search for a location', _deepPlum);
+      _snack('Please select or search for a location', coral);
       return;
     }
 
@@ -285,10 +260,10 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
         'severity': 'medium',
       });
 
-      _snack('Hazard reported successfully!', _limeGreen);
+      _snack('Hazard reported successfully!', Colors.green);
       Navigator.pop(context);
     } catch (e) {
-      _snack('Submission failed: ${e.toString()}', _deepPlum);
+      _snack('Submission failed: ${e.toString()}', coral);
     } finally {
       setState(() => _loading = false);
     }
@@ -300,25 +275,20 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
         content: Text(msg, style: const TextStyle(color: Colors.white)),
         backgroundColor: c,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
       ),
     );
   }
 
-  // ================= UI =================
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _palePink,
+      backgroundColor: cream,
       appBar: AppBar(
-        title: const Text(
-          'Report Hazard',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: _darkNavy,
-        foregroundColor: Colors.white,
+        title: const Text('Report Hazard', style: TextStyle(fontWeight: FontWeight.w600)),
+        backgroundColor: softLavender,
+        foregroundColor: deepPurple,
         elevation: 0,
       ),
       body: _loading
@@ -326,12 +296,9 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(color: _royalBlue, strokeWidth: 3),
+                  CircularProgressIndicator(color: coral, strokeWidth: 3),
                   const SizedBox(height: 16),
-                  Text(
-                    'Processing...',
-                    style: TextStyle(color: _darkNavy, fontSize: 16),
-                  ),
+                  Text('Processing...', style: TextStyle(color: deepPurple, fontSize: 16)),
                 ],
               ),
             )
@@ -363,14 +330,14 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [_darkNavy, _royalBlue],
+          colors: [softLavender, lightPurple],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: _royalBlue.withOpacity(0.3),
+            color: softLavender.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -381,32 +348,19 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withOpacity(0.9),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.report_problem, color: _limeGreen, size: 32),
+            child: Icon(Icons.report_problem_rounded, color: coral, size: 32),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Manual Hazard Report',
-                  style: TextStyle(
-                    color: _limeGreen,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('Manual Hazard Report', style: TextStyle(color: deepPurple, fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                const Text(
-                  'Help keep roads safe for everyone',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                  ),
-                ),
+                Text('Help keep roads safe for everyone', style: TextStyle(color: deepPurple.withOpacity(0.7), fontSize: 13)),
               ],
             ),
           ),
@@ -420,40 +374,30 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: DropdownButtonFormField<HazardType>(
         decoration: InputDecoration(
           labelText: 'Hazard Type *',
-          labelStyle: TextStyle(color: _darkNavy, fontWeight: FontWeight.bold),
-          prefixIcon: Icon(Icons.warning_amber, color: _coral),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: _periwinkle),
-          ),
+          labelStyle: TextStyle(color: deepPurple, fontWeight: FontWeight.w600),
+          prefixIcon: Icon(Icons.warning_amber_rounded, color: coral),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: _periwinkle.withOpacity(0.5)),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: softLavender.withOpacity(0.3)),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: _royalBlue, width: 2),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: softLavender, width: 2),
           ),
         ),
         items: HazardType.values
             .map((e) => DropdownMenuItem(
                   value: e,
-                  child: Text(
-                    _formatHazardType(e.name),
-                    style: TextStyle(color: _darkNavy),
-                  ),
+                  child: Text(_formatHazardType(e.name), style: TextStyle(color: deepPurple)),
                 ))
             .toList(),
         onChanged: (v) => setState(() => _hazardType = v),
@@ -463,10 +407,7 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
   }
 
   String _formatHazardType(String type) {
-    return type
-        .replaceAllMapped(RegExp(r'([A-Z])'), (match) => ' ${match.group(0)}')
-        .trim()
-        .toUpperCase();
+    return type.replaceAllMapped(RegExp(r'([A-Z])'), (match) => ' ${match.group(0)}').trim().toUpperCase();
   }
 
   Widget _descriptionField() {
@@ -474,36 +415,29 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: TextFormField(
         controller: _descCtrl,
         maxLines: 4,
-        style: TextStyle(color: _darkNavy),
+        style: TextStyle(color: deepPurple),
         decoration: InputDecoration(
           labelText: 'Description (Optional)',
-          labelStyle: TextStyle(color: _darkNavy, fontWeight: FontWeight.bold),
+          labelStyle: TextStyle(color: deepPurple, fontWeight: FontWeight.w600),
           hintText: 'Provide additional details about the hazard...',
           hintStyle: TextStyle(color: Colors.grey[400]),
-          prefixIcon: Icon(Icons.description, color: _periwinkle),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: _periwinkle),
-          ),
+          prefixIcon: Icon(Icons.description_rounded, color: softLavender),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: _periwinkle.withOpacity(0.5)),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: softLavender.withOpacity(0.3)),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: _royalBlue, width: 2),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: softLavender, width: 2),
           ),
         ),
       ),
@@ -515,13 +449,9 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -529,40 +459,30 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.location_on, color: _coral, size: 24),
+              Icon(Icons.location_on_rounded, color: coral, size: 24),
               const SizedBox(width: 8),
-              Text(
-                'Location *',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: _darkNavy,
-                  fontSize: 16,
-                ),
-              ),
+              Text('Location *', style: TextStyle(fontWeight: FontWeight.bold, color: deepPurple, fontSize: 16)),
             ],
           ),
           const SizedBox(height: 16),
 
-          // Address Search Field
           TextFormField(
             controller: _addressCtrl,
-            style: TextStyle(color: _darkNavy),
+            style: TextStyle(color: deepPurple),
             decoration: InputDecoration(
               labelText: 'Search Address',
               hintText: 'e.g., 16th Avenue, Gwarimpa, Abuja',
               hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
-              prefixIcon: Icon(Icons.search, color: _royalBlue),
+              prefixIcon: Icon(Icons.search_rounded, color: softLavender),
               suffixIcon: IconButton(
-                icon: Icon(Icons.send, color: _limeGreen),
+                icon: Icon(Icons.send_rounded, color: coral),
                 onPressed: _searchAddress,
                 tooltip: 'Search',
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: _royalBlue, width: 2),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: softLavender, width: 2),
               ),
             ),
             onFieldSubmitted: (_) => _searchAddress(),
@@ -570,25 +490,19 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
 
           const SizedBox(height: 16),
 
-          // Current Selection Display
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _limeGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _limeGreen),
+              color: Colors.green[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green.shade200),
             ),
             child: Row(
               children: [
-                Icon(Icons.check_circle, color: _limeGreen, size: 20),
+                Icon(Icons.check_circle_rounded, color: Colors.green[700], size: 20),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    _locationAddress,
-                    style: TextStyle(color: _darkNavy, fontSize: 13),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: Text(_locationAddress, style: TextStyle(color: deepPurple, fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
                 ),
               ],
             ),
@@ -596,18 +510,18 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
 
           const SizedBox(height: 16),
 
-          // Buttons Row
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _detectCurrentLocation,
-                  icon: const Icon(Icons.my_location),
+                  icon: const Icon(Icons.my_location_rounded, size: 20),
                   label: const Text('Current Location'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _royalBlue,
+                    backgroundColor: softLavender,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
@@ -615,12 +529,13 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _openGoogleMapsSearch,
-                  icon: const Icon(Icons.map),
+                  icon: const Icon(Icons.map_rounded, size: 20),
                   label: const Text('Search Maps'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _coral,
+                    backgroundColor: coral,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
@@ -632,23 +547,18 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
   }
 
   Widget _submitButton() {
-    return ElevatedButton(
-      onPressed: _loading ? null : _submit,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: _limeGreen,
-        disabledBackgroundColor: Colors.grey[300],
-        foregroundColor: _darkNavy,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 4,
-      ),
-      child: Text(
-        _loading ? 'Submitting...' : 'Submit Report',
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
+    return SizedBox(
+      height: 56,
+      child: ElevatedButton.icon(
+        onPressed: _loading ? null : _submit,
+        icon: const Icon(Icons.send_rounded, size: 22),
+        label: Text(_loading ? 'Submitting...' : 'Submit Report', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green[400],
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: Colors.grey[300],
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 0,
         ),
       ),
     );

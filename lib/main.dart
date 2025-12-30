@@ -31,6 +31,12 @@ void main() async {
   final bool stayLoggedIn = prefs.getBool('stay_logged_in') ?? false;
   final String? userType = prefs.getString('user_type'); // 'driver' or 'responder'
 
+if (stayLoggedIn) {
+  final now = DateTime.now().millisecondsSinceEpoch;
+  await prefs.setInt('loginTimestamp', now);
+  print('✅ Saved login state: stay=$stayLoggedIn, timestamp=$now');
+}
+
   runApp(SarhaApp(
     initialRoute: stayLoggedIn ? _getHomeRoute(userType) : '/',
   ));

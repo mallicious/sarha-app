@@ -1,11 +1,7 @@
-// lib/screen/responder_login_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// Kept original import
-// Kept original import
-import 'package:shared_preferences/shared_preferences.dart'; // Added for stay logged in
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ResponderLoginScreen extends StatefulWidget {
   const ResponderLoginScreen({super.key});
@@ -15,6 +11,13 @@ class ResponderLoginScreen extends StatefulWidget {
 }
 
 class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
+  // === CALM COLOR PALETTE ===
+  static const Color softLavender = Color(0xFFA7B5F4);
+  static const Color coral = Color(0xFFFF9B85);
+  static const Color cream = Color(0xFFFAF8F5);
+  static const Color deepPurple = Color(0xFF4A4063);
+  static const Color lightPurple = Color(0xFFD1D5F7);
+
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -24,7 +27,7 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
   
   bool _isLoading = false;
   bool _obscurePassword = true;
-  bool _stayLoggedIn = false; // Added variable for the checkbox
+  bool _stayLoggedIn = false;
 
   @override
   void dispose() {
@@ -39,25 +42,19 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Login with Firebase Auth
       final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // Check if user is verified responder
       final userDoc = await _firestore
           .collection('responders')
           .doc(userCredential.user!.uid)
           .get();
 
       if (!userDoc.exists) {
-        // Not a verified responder
         await _auth.signOut();
-        _showSnackBar(
-          'Account not found. Please sign up as a responder first.',
-          Colors.red,
-        );
+        _showSnackBar('Account not found. Please sign up as a responder first.', coral);
         return;
       }
 
@@ -66,19 +63,22 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
 
       if (!isVerified) {
         await _auth.signOut();
-        _showSnackBar(
-          'Your account is pending verification. Please wait for admin approval.',
-          Colors.orange,
-        );
+        _showSnackBar('Your account is pending verification. Please wait for admin approval.', Colors.orange);
         return;
       }
 
-      // --- SAVE PREFERENCE LOGIC ---
+      // === SAVE LOGIN STATE ===
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('stay_logged_in', _stayLoggedIn);
-      await prefs.setString('user_type', 'responder');
+      await prefs.setBool('stayLoggedIn', _stayLoggedIn);
+      await prefs.setString('userType', 'responder');
+      await prefs.setString('userId', userCredential.user!.uid);
+      
+      // Save timestamp for 2-week expiry
+      if (_stayLoggedIn) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        await prefs.setInt('loginTimestamp', now);
+      }
 
-      // Success - Navigate to Responder Dashboard
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/responderDashboard');
       }
@@ -91,9 +91,9 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
       } else if (e.code == 'invalid-email') {
         message = 'Invalid email address.';
       }
-      _showSnackBar(message, Colors.red);
+      _showSnackBar(message, coral);
     } catch (e) {
-      _showSnackBar('An error occurred: ${e.toString()}', Colors.red);
+      _showSnackBar('An error occurred: ${e.toString()}', coral);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -108,7 +108,7 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
           content: Text(message),
           backgroundColor: color,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -117,16 +117,15 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: cream,
       appBar: AppBar(
-        title: const Text('Responder Login'),
-        backgroundColor: const Color(0xFFFF9800),
-        foregroundColor: Colors.white,
+        title: const Text('Responder Login', style: TextStyle(fontWeight: FontWeight.w600)),
+        backgroundColor: softLavender,
+        foregroundColor: deepPurple,
+        elevation: 0,
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFFF9800)),
-            )
+          ? Center(child: CircularProgressIndicator(color: coral))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Form(
@@ -136,31 +135,29 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
                   children: [
                     const SizedBox(height: 20),
                     
-                    // Icon
                     Center(
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFF9800).withOpacity(0.1),
+                          color: lightPurple,
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: softLavender.withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
-                        child: const Icon(
-                          Icons.engineering,
-                          size: 80,
-                          color: Color(0xFFFF9800),
-                        ),
+                        child: Icon(Icons.engineering_rounded, size: 80, color: deepPurple),
                       ),
                     ),
 
                     const SizedBox(height: 30),
 
-                    const Text(
+                    Text(
                       'Road Authority Login',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFFF9800),
-                      ),
+                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: deepPurple),
                       textAlign: TextAlign.center,
                     ),
 
@@ -168,24 +165,28 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
 
                     Text(
                       'For verified road safety personnel only',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 14, color: deepPurple.withOpacity(0.6)),
                       textAlign: TextAlign.center,
                     ),
 
                     const SizedBox(height: 40),
 
-                    // Email Field
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Official Email *',
-                        prefixIcon: Icon(Icons.email, color: Color(0xFFFF9800)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                      style: TextStyle(color: deepPurple, fontWeight: FontWeight.w500),
+                      decoration: InputDecoration(
+                        labelText: 'Official Email',
+                        labelStyle: TextStyle(color: deepPurple.withOpacity(0.7)),
+                        prefixIcon: Icon(Icons.email_rounded, color: softLavender),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: softLavender.withOpacity(0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: softLavender, width: 2),
                         ),
                         filled: true,
                         fillColor: Colors.white,
@@ -203,23 +204,29 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
 
                     const SizedBox(height: 20),
 
-                    // Password Field
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
+                      style: TextStyle(color: deepPurple, fontWeight: FontWeight.w500),
                       decoration: InputDecoration(
-                        labelText: 'Password *',
-                        prefixIcon: const Icon(Icons.lock, color: Color(0xFFFF9800)),
+                        labelText: 'Password',
+                        labelStyle: TextStyle(color: deepPurple.withOpacity(0.7)),
+                        prefixIcon: Icon(Icons.lock_rounded, color: softLavender),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                            color: deepPurple.withOpacity(0.5),
                           ),
-                          onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
-                          },
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
-                        border: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: softLavender.withOpacity(0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: softLavender, width: 2),
                         ),
                         filled: true,
                         fillColor: Colors.white,
@@ -232,70 +239,51 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
                       },
                     ),
 
-                    // STAY LOGGED IN CHECKBOX - Added precisely as requested
+                    const SizedBox(height: 16),
+
                     CheckboxListTile(
-                      title: const Text(
-                        "Keep Me Logged In",
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      title: Text(
+                        "Keep me logged in for 2 weeks",
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: deepPurple),
                       ),
                       value: _stayLoggedIn,
-                      activeColor: const Color(0xFFFF9800),
+                      activeColor: coral,
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       onChanged: (bool? value) {
-                        setState(() {
-                          _stayLoggedIn = value ?? false;
-                        });
+                        setState(() => _stayLoggedIn = value ?? false);
                       },
                     ),
 
                     const SizedBox(height: 10),
 
-                    // Login Button
                     SizedBox(
                       height: 56,
                       child: ElevatedButton.icon(
                         onPressed: _login,
-                        icon: const Icon(Icons.login, color: Colors.white),
-                        label: const Text(
-                          'Login',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        icon: const Icon(Icons.login_rounded, size: 22),
+                        label: const Text('Login', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF9800),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 5,
+                          backgroundColor: coral,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 0,
                         ),
                       ),
                     ),
 
                     const SizedBox(height: 20),
 
-                    // Sign Up Link
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          "Don't have an account? ",
-                          style: TextStyle(color: Colors.grey[700]),
-                        ),
+                        Text("Don't have an account? ", style: TextStyle(color: deepPurple.withOpacity(0.7))),
                         GestureDetector(
-                          onTap: () {
-                            Navigator.pushNamed(context, '/responderSignup');
-                          },
-                          child: const Text(
+                          onTap: () => Navigator.pushNamed(context, '/responderSignup'),
+                          child: Text(
                             'Sign Up',
-                            style: TextStyle(
-                              color: Color(0xFFFF9800),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                            style: TextStyle(color: coral, fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                         ),
                       ],
@@ -303,25 +291,21 @@ class _ResponderLoginScreenState extends State<ResponderLoginScreen> {
 
                     const SizedBox(height: 30),
 
-                    // Info Box
                     Container(
                       padding: const EdgeInsets.all(15),
                       decoration: BoxDecoration(
                         color: Colors.blue[50],
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: Colors.blue.shade200),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, color: Colors.blue[700]),
+                          Icon(Icons.info_outline_rounded, color: Colors.blue[700]),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               'Only verified road safety personnel can access this dashboard. Your ID will be verified during signup.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue[900],
-                              ),
+                              style: TextStyle(fontSize: 12, color: Colors.blue[900]),
                             ),
                           ),
                         ],

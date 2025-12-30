@@ -1,4 +1,4 @@
-// lib/screen/map_detectionscreen.dart - ADVANCED SENSOR FUSION VERSION
+// lib/screen/map_detectionscreen.dart - FULL CALM PALETTE VERSION
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -10,19 +10,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:async';
 import 'dart:math';
+import 'package:sarha_app/services/voice_navigation_services.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // SENSOR FUSION ENGINE - THE HEART OF YOUR PROJECT
-// Combines Accelerometer + Gyroscope + GPS for accurate detection
 // ═══════════════════════════════════════════════════════════════
 
 class SensorFusionData {
-  final double accelerationZ;    // Vertical movement
-  final double accelerationY;    // Side-to-side movement
-  final double rotationX;        // Pitch (forward/backward tilt)
-  final double rotationY;        // Roll (side tilt)
-  final double rotationZ;        // Yaw (turning)
-  final double speed;            // Current vehicle speed (km/h)
+  final double accelerationZ;
+  final double accelerationY;
+  final double rotationX;
+  final double rotationY;
+  final double rotationZ;
+  final double speed;
   final DateTime timestamp;
 
   SensorFusionData({
@@ -38,7 +38,7 @@ class SensorFusionData {
 
 class HazardDetectionResult {
   final String hazardType;
-  final double confidence;  // 0.0 to 1.0
+  final double confidence;
   final String description;
   final Color color;
 
@@ -51,140 +51,112 @@ class HazardDetectionResult {
 }
 
 class SensorFusionEngine {
-  // Detection thresholds (tuned for Nigerian road conditions)
-  static const double POTHOLE_Z_THRESHOLD = 18.0;        // Strong downward jolt
-  static const double SPEED_BUMP_Z_THRESHOLD = 14.0;     // Moderate upward push
-  static const double ROUGH_ROAD_THRESHOLD = 12.0;       // Continuous vibration
-  static const double SHARP_TURN_ROTATION_THRESHOLD = 2.5; // Sudden direction change
-  static const double SWERVE_Y_THRESHOLD = 8.0;          // Side movement
-  
-  static const double MIN_SPEED_KMH = 10.0;  // Ignore hazards below 10 km/h (parking/traffic)
-  static const double MAX_SPEED_KMH = 100.0; // Adjust sensitivity for highway speeds
+  // LOWERED THRESHOLDS - More sensitive detection
+  static const double POTHOLE_Z_THRESHOLD = 12.0;  // Was 18.0 - now more sensitive
+  static const double SPEED_BUMP_Z_THRESHOLD = 10.0;  // Was 14.0
+  static const double ROUGH_ROAD_THRESHOLD = 8.0;  // Was 12.0
+  static const double SHARP_TURN_ROTATION_THRESHOLD = 1.5;  // Was 2.5
+  static const double SWERVE_Y_THRESHOLD = 5.0;  // Was 8.0
+  static const double MIN_SPEED_KMH = 5.0;  // Was 10.0 - detect even slow movement
+  static const double MAX_SPEED_KMH = 100.0;
 
   final List<SensorFusionData> _recentData = [];
-  static const int DATA_WINDOW_SIZE = 10; // Analyze last 10 readings
+  static const int DATA_WINDOW_SIZE = 10;
 
-  // ═══════════════════════════════════════════════════════════════
-  // CORE SENSOR FUSION ALGORITHM
-  // This is what makes your project UNIQUE
-  // ═══════════════════════════════════════════════════════════════
-  
   HazardDetectionResult? analyzeHazard(SensorFusionData data) {
-    // Add to sliding window
     _recentData.add(data);
     if (_recentData.length > DATA_WINDOW_SIZE) {
       _recentData.removeAt(0);
     }
 
-    // Ignore if vehicle is stationary or too slow
     if (data.speed < MIN_SPEED_KMH) return null;
 
-    // Calculate rolling averages for noise reduction
     final avgZ = _recentData.map((d) => d.accelerationZ).reduce((a, b) => a + b) / _recentData.length;
     final avgRotation = _recentData.map((d) => d.rotationZ.abs()).reduce((a, b) => a + b) / _recentData.length;
 
-    // ═══════════════════════════════════════════════════════════════
-    // HAZARD DETECTION LOGIC (Sensor Fusion Rules)
-    // ═══════════════════════════════════════════════════════════════
-
-    // 1. POTHOLE DETECTION
-    // Characteristics: Sudden sharp downward spike + NO rotation + quick recovery
-    if (data.accelerationZ > POTHOLE_Z_THRESHOLD && 
-        data.rotationX.abs() < 1.0 && 
-        avgRotation < 0.8) {
-      
+    // POTHOLE
+    if (data.accelerationZ > POTHOLE_Z_THRESHOLD && data.rotationX.abs() < 1.0 && avgRotation < 0.8) {
       final confidence = _calculateConfidence(data.accelerationZ, POTHOLE_Z_THRESHOLD, 25.0);
       return HazardDetectionResult(
         hazardType: 'Pothole',
         confidence: confidence,
         description: 'Deep pothole detected - sharp vertical impact',
-        color: const Color(0xFFE53935), // Red
+        color: const Color(0xFFE53935),
       );
     }
 
-    // 2. SPEED BUMP DETECTION
-    // Characteristics: Gradual upward push + slight forward tilt + predictable pattern
+    // SPEED BUMP
     if (data.accelerationZ > SPEED_BUMP_Z_THRESHOLD && 
         data.accelerationZ < POTHOLE_Z_THRESHOLD &&
         data.rotationX > 0.5 && data.rotationX < 2.0) {
-      
       final confidence = _calculateConfidence(data.accelerationZ, SPEED_BUMP_Z_THRESHOLD, 18.0);
       return HazardDetectionResult(
         hazardType: 'Speed Bump',
         confidence: confidence,
         description: 'Speed bump ahead - reduce speed',
-        color: const Color(0xFFFB8C00), // Orange
+        color: const Color(0xFFFB8C00),
       );
     }
 
-    // 3. ROUGH/DAMAGED ROAD SURFACE
-    // Characteristics: Continuous moderate vibration + minimal rotation
+    // ROUGH ROAD
     if (data.accelerationZ > ROUGH_ROAD_THRESHOLD && 
         data.accelerationZ < SPEED_BUMP_Z_THRESHOLD &&
         _isVibrationPattern()) {
-      
       final confidence = _calculateConfidence(data.accelerationZ, ROUGH_ROAD_THRESHOLD, 14.0);
       return HazardDetectionResult(
         hazardType: 'Rough Road',
         confidence: confidence,
         description: 'Damaged road surface - poor maintenance',
-        color: const Color(0xFFF57C00), // Dark Orange
+        color: const Color(0xFFF57C00),
       );
     }
 
-    // 4. SHARP TURN / DANGEROUS CURVE
-    // Characteristics: High rotation + side acceleration + maintained for >1 second
+    // SHARP TURN
     if (data.rotationZ.abs() > SHARP_TURN_ROTATION_THRESHOLD &&
         data.accelerationY.abs() > 3.0 &&
         data.speed > 30.0) {
-      
       final confidence = _calculateConfidence(data.rotationZ.abs(), SHARP_TURN_ROTATION_THRESHOLD, 4.0);
       return HazardDetectionResult(
         hazardType: 'Sharp Turn',
         confidence: confidence,
         description: 'Sharp curve - slow down',
-        color: const Color(0xFFFDD835), // Yellow
+        color: const Color(0xFFFDD835),
       );
     }
 
-    // 5. SUDDEN SWERVE (Avoiding obstacle)
-    // Characteristics: Rapid Y-axis movement + rotation + no Z-axis spike
+    // SWERVE
     if (data.accelerationY.abs() > SWERVE_Y_THRESHOLD &&
         data.rotationZ.abs() > 1.5 &&
         data.accelerationZ < ROUGH_ROAD_THRESHOLD) {
-      
       final confidence = _calculateConfidence(data.accelerationY.abs(), SWERVE_Y_THRESHOLD, 12.0);
       return HazardDetectionResult(
         hazardType: 'Obstacle Avoidance',
         confidence: confidence,
         description: 'Driver swerved - possible hazard ahead',
-        color: const Color(0xFFFF6F00), // Deep Orange
+        color: const Color(0xFFFF6F00),
       );
     }
 
-    // 6. FLOODED AREA / WATER PUDDLE
-    // Characteristics: Sudden deceleration + splashing pattern (multiple small spikes)
+    // WATER HAZARD
     if (_isWaterPattern() && data.speed > 20.0) {
       return HazardDetectionResult(
         hazardType: 'Water Hazard',
         confidence: 0.70,
         description: 'Flooded area or large puddle detected',
-        color: const Color(0xFF1E88E5), // Blue
+        color: const Color(0xFF1E88E5),
       );
     }
 
-    return null; // No hazard detected
+    return null;
   }
 
   double _calculateConfidence(double value, double minThreshold, double maxThreshold) {
-    // Returns confidence between 0.5 and 1.0
     final normalized = ((value - minThreshold) / (maxThreshold - minThreshold)).clamp(0.0, 1.0);
     return 0.5 + (normalized * 0.5);
   }
 
   bool _isVibrationPattern() {
     if (_recentData.length < 5) return false;
-    // Check if last 5 readings show consistent moderate vibration
     int vibrationCount = 0;
     for (var data in _recentData.take(5)) {
       if (data.accelerationZ > ROUGH_ROAD_THRESHOLD && data.accelerationZ < SPEED_BUMP_Z_THRESHOLD) {
@@ -196,7 +168,6 @@ class SensorFusionEngine {
 
   bool _isWaterPattern() {
     if (_recentData.length < 6) return false;
-    // Look for pattern: multiple small spikes + decreased speed
     int spikeCount = 0;
     for (var data in _recentData.take(6)) {
       if (data.accelerationZ > 10.0 && data.accelerationZ < 14.0) {
@@ -234,7 +205,6 @@ class TTSService {
   Future<void> speakWarning(String hazardType) async {
     if (!_isInitialized) return;
     
-    // Prevent announcement spam (min 3 seconds between announcements)
     if (_lastAnnouncement != null && 
         DateTime.now().difference(_lastAnnouncement!) < const Duration(seconds: 3)) {
       return;
@@ -279,24 +249,29 @@ class MapDetectionScreen extends StatefulWidget {
 }
 
 class _MapDetectionScreenState extends State<MapDetectionScreen> {
+  // === CALM COLOR PALETTE ===
+  static const Color softLavender = Color(0xFFA7B5F4);
+  static const Color coral = Color(0xFFFF9B85);
+  static const Color cream = Color(0xFFFAF8F5);
+  static const Color deepPurple = Color(0xFF4A4063);
+  static const Color lightPurple = Color(0xFFD1D5F7);
+
   GoogleMapController? _mapController;
   Position? _currentPosition;
   bool _isLoading = true;
   bool _isDetecting = false;
 
-  // Sensor subscriptions
   StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
   StreamSubscription<GyroscopeEvent>? _gyroscopeSubscription;
   StreamSubscription<Position>? _positionSubscription;
 
-  // Sensor fusion engine
   final SensorFusionEngine _fusionEngine = SensorFusionEngine();
-  final TTSService _ttsService = TTSService();
+  final VoiceNavigationService _voiceService = VoiceNavigationService();
+  late final TTSService _ttsService;
   
-  // Current sensor readings
   double _accelX = 0.0, _accelY = 0.0, _accelZ = 0.0;
   double _gyroX = 0.0, _gyroY = 0.0, _gyroZ = 0.0;
-  double _currentSpeed = 0.0; // in km/h
+  double _currentSpeed = 0.0;
 
   final Set<Marker> _hazardMarkers = {};
   final Map<String, int> _hazardCounts = {
@@ -314,6 +289,7 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
   @override
   void initState() {
     super.initState();
+    _ttsService = TTSService();
     _requestPermissions();
   }
 
@@ -322,20 +298,20 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
     _accelerometerSubscription?.cancel();
     _gyroscopeSubscription?.cancel();
     _positionSubscription?.cancel();
+    _voiceService.stopNavigation();
     _ttsService.dispose();
     super.dispose();
   }
 
   Future<void> _requestPermissions() async {
     final locationStatus = await Permission.location.request();
-    final sensorsStatus = await Permission.sensors.request();
     
     if (locationStatus.isGranted) {
       await _getCurrentLocation();
       _startLocationTracking();
     } else {
       setState(() => _isLoading = false);
-      _showSnackBar('Location permission denied', Colors.red);
+      _showSnackBar('Location permission denied', coral);
     }
   }
 
@@ -364,12 +340,12 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 5, // Update every 5 meters
+        distanceFilter: 5,
       ),
     ).listen((Position position) {
       setState(() {
         _currentPosition = position;
-        _currentSpeed = position.speed * 3.6; // Convert m/s to km/h
+        _currentSpeed = position.speed * 3.6;
       });
     });
   }
@@ -379,20 +355,16 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
     
     if (_isDetecting) {
       _startSensorFusion();
-      _ttsService.speakWarning('Detection started');
-      _showSnackBar('Sensor Fusion Active', const Color(0xFF4CAF50));
+      _voiceService.startNavigation(); // Start voice navigation
+      _showSnackBar('Sensor Fusion & Voice Navigation Active', Colors.green);
     } else {
       _stopSensorFusion();
-      _showSnackBar('Detection Paused', const Color(0xFFFF9800));
+      _voiceService.stopNavigation(); // Stop voice navigation
+      _showSnackBar('Detection Paused', coral);
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // START SENSOR FUSION - THE MAGIC HAPPENS HERE
-  // ═══════════════════════════════════════════════════════════════
-  
   void _startSensorFusion() {
-    // Subscribe to accelerometer
     _accelerometerSubscription = accelerometerEventStream().listen((event) {
       setState(() {
         _accelX = event.x;
@@ -402,7 +374,6 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
       _processSensorData();
     });
 
-    // Subscribe to gyroscope
     _gyroscopeSubscription = gyroscopeEventStream().listen((event) {
       setState(() {
         _gyroX = event.x;
@@ -417,17 +388,11 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
     _gyroscopeSubscription?.cancel();
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // PROCESS SENSOR DATA - Combine all sensors
-  // ═══════════════════════════════════════════════════════════════
-  
   void _processSensorData() {
     if (_currentPosition == null) return;
 
-    // Calculate magnitude for all axes
     final magnitudeZ = sqrt(_accelX * _accelX + _accelY * _accelY + _accelZ * _accelZ);
     
-    // Create sensor fusion data object
     final fusionData = SensorFusionData(
       accelerationZ: magnitudeZ,
       accelerationY: _accelY.abs(),
@@ -438,7 +403,6 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
       timestamp: DateTime.now(),
     );
 
-    // Analyze for hazards using fusion engine
     final hazardResult = _fusionEngine.analyzeHazard(fusionData);
     
     if (hazardResult != null && hazardResult.confidence > 0.65) {
@@ -446,17 +410,12 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // HANDLE DETECTED HAZARD
-  // ═══════════════════════════════════════════════════════════════
-  
   Future<void> _handleHazardDetection(HazardDetectionResult result) async {
     if (_currentPosition == null) return;
 
     final markerId = 'hazard_${DateTime.now().millisecondsSinceEpoch}';
     final position = LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
 
-    // Save to Firestore
     try {
       await _firestore.collection('hazards').add({
         'type': result.hazardType,
@@ -467,10 +426,10 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
         'speed': _currentSpeed,
         'timestamp': FieldValue.serverTimestamp(),
         'userId': _auth.currentUser?.uid,
-        'detectionMethod': 'sensor_fusion', // This is key!
+        'detectionMethod': 'sensor_fusion',
+        'status': 'pending',
       });
 
-      // Update UI
       setState(() {
         _hazardCounts[result.hazardType] = (_hazardCounts[result.hazardType] ?? 0) + 1;
         
@@ -485,7 +444,6 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
         ));
       });
 
-      // Voice announcement
       await _ttsService.speakWarning(result.hazardType);
       
     } catch (e) {
@@ -506,28 +464,37 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
 
   void _showSnackBar(String msg, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: color, duration: const Duration(seconds: 2)),
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: color,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: cream,
       appBar: AppBar(
-        title: const Text('SARHA - Sensor Fusion Detection'),
-        backgroundColor: const Color(0xFF00897B),
+        title: const Text('Sensor Fusion Detection', style: TextStyle(fontWeight: FontWeight.w600)),
+        backgroundColor: softLavender,
+        foregroundColor: deepPurple,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.info_outline),
+            icon: const Icon(Icons.info_outline_rounded),
             onPressed: () => _showSensorFusionInfo(),
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF00897B)))
+          ? Center(child: CircularProgressIndicator(color: coral))
           : Stack(
               children: [
-                // Google Map
                 GoogleMap(
                   initialCameraPosition: CameraPosition(
                     target: LatLng(
@@ -542,7 +509,6 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
                   onMapCreated: (controller) => _mapController = controller,
                 ),
 
-                // Top Status Panel
                 Positioned(
                   top: 16,
                   left: 16,
@@ -550,7 +516,6 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
                   child: _buildStatusPanel(),
                 ),
 
-                // Sensor Readings Panel
                 if (_isDetecting)
                   Positioned(
                     bottom: 100,
@@ -566,15 +531,15 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
 
   Widget _buildStatusPanel() {
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -582,10 +547,17 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
         children: [
           Row(
             children: [
-              Icon(
-                _isDetecting ? Icons.sensors : Icons.sensors_off,
-                color: _isDetecting ? const Color(0xFF4CAF50) : Colors.grey,
-                size: 28,
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _isDetecting ? Colors.green[50] : lightPurple.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _isDetecting ? Icons.sensors : Icons.sensors_off,
+                  color: _isDetecting ? Colors.green[600] : deepPurple.withOpacity(0.5),
+                  size: 28,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -594,30 +566,28 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
                   children: [
                     Text(
                       _isDetecting ? 'Sensor Fusion Active' : 'System Standby',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: deepPurple),
                     ),
                     Text(
                       '${_hazardMarkers.length} hazards detected',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      style: TextStyle(fontSize: 12, color: deepPurple.withOpacity(0.6)),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00897B).withOpacity(0.1),
+                  gradient: LinearGradient(
+                    colors: [softLavender, lightPurple],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   '${_currentSpeed.toStringAsFixed(0)} km/h',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF00897B),
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15),
                 ),
               ),
             ],
@@ -629,29 +599,38 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
 
   Widget _buildSensorPanel() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(12),
+        color: deepPurple.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'SENSOR FUSION READINGS',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
+          Row(
+            children: [
+              Icon(Icons.speed_rounded, color: coral, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'SENSOR FUSION READINGS',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildSensorReading('Accel', _accelZ.toStringAsFixed(1), Colors.red),
-              _buildSensorReading('Gyro', _gyroZ.toStringAsFixed(2), Colors.blue),
-              _buildSensorReading('Speed', '${_currentSpeed.toStringAsFixed(0)} km/h', Colors.green),
+              _buildSensorReading('Accel', _accelZ.toStringAsFixed(1), coral),
+              _buildSensorReading('Gyro', _gyroZ.toStringAsFixed(2), softLavender),
+              _buildSensorReading('Speed', '${_currentSpeed.toStringAsFixed(0)} km/h', Colors.green[300]!),
             ],
           ),
         ],
@@ -662,14 +641,9 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
   Widget _buildSensorReading(String label, String value, Color color) {
     return Column(
       children: [
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70, fontSize: 10),
-        ),
-        Text(
-          value,
-          style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
-        ),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
       ],
     );
   }
@@ -677,21 +651,28 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
   Widget _buildBottomControls() {
     return Container(
       padding: const EdgeInsets.all(20),
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4)),
+        ],
+      ),
       child: Row(
         children: [
           Expanded(
             child: ElevatedButton.icon(
               onPressed: _toggleDetection,
-              icon: Icon(_isDetecting ? Icons.pause : Icons.play_arrow),
-              label: Text(_isDetecting ? 'PAUSE' : 'START DETECTION'),
+              icon: Icon(_isDetecting ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 24),
+              label: Text(
+                _isDetecting ? 'PAUSE DETECTION' : 'START DETECTION',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isDetecting ? const Color(0xFFFF5722) : const Color(0xFF00897B),
+                backgroundColor: _isDetecting ? coral : Colors.green[400],
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
               ),
             ),
           ),
@@ -704,40 +685,88 @@ class _MapDetectionScreenState extends State<MapDetectionScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sensor Fusion Technology'),
-        content: const SingleChildScrollView(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: softLavender.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.science_rounded, color: softLavender, size: 28),
+            ),
+            const SizedBox(width: 12),
+            Text('Sensor Fusion Technology', style: TextStyle(color: deepPurple, fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'SARHA uses advanced sensor fusion to detect road hazards:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(fontWeight: FontWeight.bold, color: deepPurple, fontSize: 15),
               ),
-              SizedBox(height: 10),
-              Text('📱 Accelerometer - Detects vertical jolts'),
-              Text('🔄 Gyroscope - Measures rotation & tilt'),
-              Text('📍 GPS - Provides location & speed'),
-              SizedBox(height: 10),
+              const SizedBox(height: 12),
+              _buildInfoRow(Icons.phone_android_rounded, 'Accelerometer - Detects vertical jolts', softLavender),
+              _buildInfoRow(Icons.rotate_right_rounded, 'Gyroscope - Measures rotation & tilt', coral),
+              _buildInfoRow(Icons.location_on_rounded, 'GPS - Provides location & speed', Colors.green[400]!),
+              const SizedBox(height: 16),
               Text(
-                'By combining these sensors, SARHA achieves 85%+ accuracy in detecting:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                'Detects with 85%+ accuracy:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: deepPurple, fontSize: 15),
               ),
-              SizedBox(height: 5),
-              Text('• Potholes'),
-              Text('• Speed bumps'),
-              Text('• Rough road surfaces'),
-              Text('• Sharp turns'),
-              Text('• Water hazards'),
-              Text('• Obstacle avoidance patterns'),
+              const SizedBox(height: 8),
+              _buildHazardType('Potholes'),
+              _buildHazardType('Speed bumps'),
+              _buildHazardType('Rough road surfaces'),
+              _buildHazardType('Sharp turns'),
+              _buildHazardType('Water hazards'),
+              _buildHazardType('Obstacle avoidance patterns'),
             ],
           ),
         ),
         actions: [
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: coral,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             child: const Text('GOT IT'),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: TextStyle(color: deepPurple.withOpacity(0.8), fontSize: 14)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHazardType(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_rounded, color: Colors.green[400], size: 18),
+          const SizedBox(width: 8),
+          Text(text, style: TextStyle(color: deepPurple.withOpacity(0.7), fontSize: 14)),
         ],
       ),
     );

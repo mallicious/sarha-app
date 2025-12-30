@@ -1,8 +1,7 @@
-// lib/screen/edit_profilescreen.dart - NEW COLOR PALETTE
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
@@ -14,25 +13,27 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  // === NEW COLOR PALETTE ===
-  final Color _primaryTeal = const Color(0xFF3C959B);
-  final Color _darkTeal = const Color(0xFF1F565E);
-  final Color _burgundy = const Color(0xFF6E1E42);
-  final Color _peach = const Color(0xFFF7AD97);
-  final Color _lime = const Color(0xFFDADE5B);
-  final Color _lightBg = const Color(0xFFF5F5F5);
+  // === CALM COLOR PALETTE ===
+  static const Color softLavender = Color(0xFFA7B5F4);
+  static const Color coral = Color(0xFFFF9B85);
+  static const Color cream = Color(0xFFFAF8F5);
+  static const Color deepPurple = Color(0xFF4A4063);
+  static const Color lightPurple = Color(0xFFD1D5F7);
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  
+  final _emailController = TextEditingController();
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
   final ImagePicker _picker = ImagePicker();
-  
+
   File? _selectedImage;
   bool _isLoading = false;
   String? _currentProfilePicUrl;
+  double _uploadProgress = 0.0;
 
   @override
   void initState() {
@@ -44,6 +45,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -64,8 +66,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       } else {
         _nameController.text = user.displayName ?? '';
       }
+      _emailController.text = user.email ?? '';
     } catch (e) {
-      _showSnackBar('Failed to load profile data', _burgundy);
+      _showSnackBar('Failed to load profile data', coral);
     } finally {
       setState(() => _isLoading = false);
     }
@@ -84,10 +87,57 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         setState(() {
           _selectedImage = File(image.path);
         });
-        _showSnackBar('Image selected! Click Save to update.', _lime);
+        _showSnackBar('Image selected! Click Save to update.', Colors.green);
       }
     } catch (e) {
-      _showSnackBar('Failed to pick image: ${e.toString()}', _burgundy);
+      _showSnackBar('Failed to pick image: ${e.toString()}', coral);
+    }
+  }
+
+  Future<String?> _uploadProfileImage() async {
+    if (_selectedImage == null) return _currentProfilePicUrl;
+
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      // Delete old image if it exists
+      if (_currentProfilePicUrl != null && _currentProfilePicUrl!.isNotEmpty) {
+        try {
+          final oldRef = _storage.refFromURL(_currentProfilePicUrl!);
+          await oldRef.delete();
+        } catch (e) {
+          print('Could not delete old image: $e');
+        }
+      }
+
+      // Upload new image with better error handling
+      final fileName = 'profile_${user.uid}.jpg'; // Use consistent filename
+      final storageRef = _storage.ref('profile_pictures/$fileName'); // Use ref() not child()
+
+      // Upload with metadata
+      final uploadTask = storageRef.putFile(
+        _selectedImage!,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+
+      // Track upload progress
+      uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+        if (mounted) {
+          setState(() {
+            _uploadProgress = snapshot.bytesTransferred / snapshot.totalBytes;
+          });
+        }
+      });
+
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      return downloadUrl;
+    } catch (e) {
+      print('Upload error details: $e');
+      _showSnackBar('Failed to upload: ${e.toString().split(':').last}', coral);
+      return null;
     }
   }
 
@@ -100,23 +150,56 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Upload image if one was selected
+      String? profilePicUrl = _currentProfilePicUrl;
+      if (_selectedImage != null) {
+        _showSnackBar('Uploading image...', Colors.blue);
+        profilePicUrl = await _uploadProfileImage();
+        if (profilePicUrl == null) {
+          _showSnackBar('Failed to upload image', coral);
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+
+      // Update email if changed
+      if (_emailController.text.trim() != user.email) {
+        try {
+          await user.verifyBeforeUpdateEmail(_emailController.text.trim());
+          _showSnackBar('Verification email sent! Check your inbox.', Colors.blue);
+        } catch (e) {
+          _showSnackBar('Failed to update email: ${e.toString()}', coral);
+        }
+      }
+
+      // Update display name in Firebase Auth
       await user.updateDisplayName(_nameController.text.trim());
 
+      // Update Firestore user document
       await _firestore.collection('users').doc(user.uid).set({
         'displayName': _nameController.text.trim(),
         'phoneNumber': _phoneController.text.trim(),
-        'email': user.email,
+        'email': _emailController.text.trim(),
+        'profilePicUrl': profilePicUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      _showSnackBar('Profile updated successfully!', _lime);
+      // Update local state
+      setState(() {
+        _currentProfilePicUrl = profilePicUrl;
+        _selectedImage = null;
+        _uploadProgress = 0.0;
+      });
+
+      _showSnackBar('Profile updated successfully!', Colors.green);
       
+      // Wait a moment then go back
       await Future.delayed(const Duration(seconds: 1));
       if (mounted) {
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, true);
       }
     } catch (e) {
-      _showSnackBar('Failed to update profile', _burgundy);
+      _showSnackBar('Failed to update profile: ${e.toString()}', coral);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -131,7 +214,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           content: Text(message, style: const TextStyle(color: Colors.white)),
           backgroundColor: color,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -143,15 +226,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final user = _auth.currentUser;
 
     return Scaffold(
-      backgroundColor: _lightBg,
+      backgroundColor: cream,
       appBar: AppBar(
-        title: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: _primaryTeal,
-        foregroundColor: Colors.white,
+        title: const Text('Edit Profile', style: TextStyle(fontWeight: FontWeight.w600)),
+        backgroundColor: softLavender,
+        foregroundColor: deepPurple,
         elevation: 0,
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: _primaryTeal))
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: coral),
+                  const SizedBox(height: 20),
+                  if (_uploadProgress > 0 && _uploadProgress < 1)
+                    Column(
+                      children: [
+                        Text('Uploading image...', style: TextStyle(color: deepPurple)),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: 200,
+                          child: LinearProgressIndicator(
+                            value: _uploadProgress,
+                            backgroundColor: lightPurple,
+                            valueColor: AlwaysStoppedAnimation<Color>(coral),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: coral),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Form(
@@ -170,7 +281,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: _primaryTeal.withOpacity(0.3),
+                                  color: softLavender.withOpacity(0.3),
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
@@ -178,18 +289,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ),
                             child: CircleAvatar(
                               radius: 70,
-                              backgroundColor: _primaryTeal.withOpacity(0.1),
+                              backgroundColor: lightPurple,
                               backgroundImage: _selectedImage != null
                                   ? FileImage(_selectedImage!)
-                                  : null,
-                              child: _selectedImage == null
+                                  : (_currentProfilePicUrl != null
+                                      ? NetworkImage(_currentProfilePicUrl!)
+                                      : null) as ImageProvider?,
+                              child: (_selectedImage == null && _currentProfilePicUrl == null)
                                   ? Text(
                                       _nameController.text.isNotEmpty
                                           ? _nameController.text[0].toUpperCase()
                                           : user?.email?[0].toUpperCase() ?? 'U',
                                       style: TextStyle(
                                         fontSize: 50,
-                                        color: _primaryTeal,
+                                        color: deepPurple,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     )
@@ -202,7 +315,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: _lime,
+                                color: coral,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
@@ -212,9 +325,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   ),
                                 ],
                               ),
-                              child: Icon(
-                                Icons.camera_alt,
-                                color: _darkTeal,
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                color: Colors.white,
                                 size: 22,
                               ),
                             ),
@@ -228,78 +341,67 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     Text(
                       'Tap to change photo',
                       style: TextStyle(
-                        color: _darkTeal.withOpacity(0.6),
+                        color: deepPurple.withOpacity(0.6),
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
 
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 32),
 
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: _peach.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _peach.withOpacity(0.5)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline, color: _burgundy, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Photo upload is disabled for cost control. Name and phone changes will be saved.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: _burgundy,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    // Email (Read-only)
+                    // Email Field
                     TextFormField(
-                      initialValue: user?.email ?? '',
-                      enabled: false,
-                      style: TextStyle(color: _darkTeal.withOpacity(0.6)),
+                      controller: _emailController,
+                      style: TextStyle(color: deepPurple, fontWeight: FontWeight.w500),
                       decoration: InputDecoration(
-                        labelText: 'Email (Cannot be changed)',
-                        labelStyle: TextStyle(color: _darkTeal.withOpacity(0.7)),
-                        prefixIcon: Icon(Icons.email_outlined, color: _primaryTeal),
+                        labelText: 'Email',
+                        labelStyle: TextStyle(color: deepPurple.withOpacity(0.7)),
+                        prefixIcon: Icon(Icons.email_outlined, color: softLavender),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: _primaryTeal.withOpacity(0.3)),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: softLavender.withOpacity(0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: softLavender, width: 2),
                         ),
                         filled: true,
-                        fillColor: Colors.grey[200],
+                        fillColor: Colors.white,
                       ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your email';
+                        }
+                        if (!value.contains('@')) {
+                          return 'Please enter a valid email';
+                        }
+                        return null;
+                      },
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
                     // Name Field
                     TextFormField(
                       controller: _nameController,
-                      style: TextStyle(color: _darkTeal, fontWeight: FontWeight.w500),
+                      style: TextStyle(color: deepPurple, fontWeight: FontWeight.w500),
                       decoration: InputDecoration(
-                        labelText: 'Full Name *',
-                        labelStyle: TextStyle(color: _primaryTeal),
-                        prefixIcon: Icon(Icons.person_outline, color: _primaryTeal),
+                        labelText: 'Full Name',
+                        labelStyle: TextStyle(color: deepPurple.withOpacity(0.7)),
+                        prefixIcon: Icon(Icons.person_outline_rounded, color: softLavender),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: _primaryTeal.withOpacity(0.3)),
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: softLavender.withOpacity(0.3)),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: _primaryTeal, width: 2),
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: softLavender, width: 2),
                         ),
                         filled: true,
                         fillColor: Colors.white,
@@ -312,34 +414,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       },
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
                     // Phone Field
                     TextFormField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
-                      style: TextStyle(color: _darkTeal, fontWeight: FontWeight.w500),
+                      style: TextStyle(color: deepPurple, fontWeight: FontWeight.w500),
                       decoration: InputDecoration(
                         labelText: 'Phone Number (Optional)',
-                        labelStyle: TextStyle(color: _primaryTeal),
-                        prefixIcon: Icon(Icons.phone_outlined, color: _primaryTeal),
+                        labelStyle: TextStyle(color: deepPurple.withOpacity(0.7)),
+                        prefixIcon: Icon(Icons.phone_outlined, color: softLavender),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: _primaryTeal.withOpacity(0.3)),
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: softLavender.withOpacity(0.3)),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: _primaryTeal, width: 2),
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: softLavender, width: 2),
                         ),
                         filled: true,
                         fillColor: Colors.white,
                       ),
                     ),
 
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 32),
 
                     // Save Button
                     SizedBox(
@@ -347,26 +449,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       height: 54,
                       child: ElevatedButton.icon(
                         onPressed: _saveProfile,
-                        icon: const Icon(Icons.check_circle_outline, color: Colors.white, size: 22),
+                        icon: const Icon(Icons.check_circle_outline_rounded, size: 22),
                         label: const Text(
                           'Save Changes',
                           style: TextStyle(
                             fontSize: 17,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryTeal,
+                          backgroundColor: coral,
+                          foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          elevation: 4,
+                          elevation: 0,
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
                     // Cancel Button
                     SizedBox(
@@ -374,19 +476,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       height: 54,
                       child: OutlinedButton.icon(
                         onPressed: () => Navigator.pop(context),
-                        icon: Icon(Icons.close, color: _burgundy, size: 22),
+                        icon: Icon(Icons.close_rounded, color: deepPurple, size: 22),
                         label: Text(
                           'Cancel',
                           style: TextStyle(
                             fontSize: 17,
-                            color: _burgundy,
-                            fontWeight: FontWeight.bold,
+                            color: deepPurple,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: _burgundy, width: 2),
+                          side: BorderSide(color: softLavender, width: 2),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                       ),
