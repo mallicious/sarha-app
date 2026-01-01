@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'responder_loginscreen.dart';
-import 'home_screen.dart';
+import 'home_screen.dart'; // ✅ Make sure this import exists
 import 'responder_dashboard_screen.dart';
 import 'login_screen.dart';
 
@@ -24,61 +24,62 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
   bool _isDriverPressed = false;
   bool _isResponderPressed = false;
 
- @override
-void initState() {
-  super.initState();
-  _checkAutoLogin();
-}
-
-Future<void> _checkAutoLogin() async {
-  final prefs = await SharedPreferences.getInstance();
-  final stayLoggedIn = prefs.getBool('stayLoggedIn') ?? false;
-  final userType = prefs.getString('userType');
-  final loginTimestamp = prefs.getInt('loginTimestamp');
-  
-  print('🔍 Auto-login check: stayLoggedIn=$stayLoggedIn, userType=$userType');
-  
-  if (!stayLoggedIn || userType == null) {
-    print('❌ No auto-login: stay=$stayLoggedIn, type=$userType');
-    return;
+  @override
+  void initState() {
+    super.initState();
+    _checkAutoLogin();
   }
 
-  // Check if 2 weeks have passed
-  if (loginTimestamp != null) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final twoWeeksInMs = 14 * 24 * 60 * 60 * 1000;
+  Future<void> _checkAutoLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stayLoggedIn = prefs.getBool('stayLoggedIn') ?? false;
+    final userType = prefs.getString('userType');
+    final loginTimestamp = prefs.getInt('loginTimestamp');
     
-    if (now - loginTimestamp > twoWeeksInMs) {
-      print('⏰ Login expired (>2 weeks)');
-      await prefs.remove('stayLoggedIn');
-      await prefs.remove('loginTimestamp');
+    print('🔍 Auto-login check: stayLoggedIn=$stayLoggedIn, userType=$userType');
+    
+    if (!stayLoggedIn || userType == null) {
+      print('❌ No auto-login: stay=$stayLoggedIn, type=$userType');
       return;
     }
+
+    // Check if 2 weeks have passed
+    if (loginTimestamp != null) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final twoWeeksInMs = 14 * 24 * 60 * 60 * 1000;
+      
+      if (now - loginTimestamp > twoWeeksInMs) {
+        print('⏰ Login expired (>2 weeks)');
+        await prefs.remove('stayLoggedIn');
+        await prefs.remove('loginTimestamp');
+        return;
+      }
+    }
+
+    // Check if user is actually logged into Firebase
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && mounted) {
+      print('✅ Auto-login successful! Navigating to $userType dashboard');
+      
+      // Small delay to show splash/logo
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (userType == 'driver') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()), // Make sure HomeScreen class exists in home_screen.dart
+        );
+      } else if (userType == 'responder') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ResponderDashboardScreen()),
+        );
+      }
+    } else {
+      print('❌ No Firebase user found');
+    }
   }
 
-  // Check if user is actually logged into Firebase
-  final user = FirebaseAuth.instance.currentUser;
-  if (user != null && mounted) {
-    print('✅ Auto-login successful! Navigating to $userType dashboard');
-    
-    // Small delay to show splash/logo
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    if (userType == 'driver') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-    } else if (userType == 'responder') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const ResponderDashboardScreen()),
-      );
-    }
-  } else {
-    print('❌ No Firebase user found');
-  }
-}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,12 +108,12 @@ Future<void> _checkAutoLogin() async {
                     ),
                   ],
                 ),
-                child: Icon(Icons.warning_amber_rounded, size: 80, color: Colors.white),
+                child: const Icon(Icons.warning_amber_rounded, size: 80, color: Colors.white),
               ),
 
               const SizedBox(height: 40),
 
-              Text(
+              const Text(
                 'Welcome to SARHA',
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: deepPurple),
               ),
@@ -183,9 +184,9 @@ Future<void> _checkAutoLogin() async {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.security_rounded, color: deepPurple, size: 18),
+                    const Icon(Icons.security_rounded, color: deepPurple, size: 18),
                     const SizedBox(width: 8),
-                    Text(
+                    const Text(
                       'Secure Roadside Monitoring',
                       style: TextStyle(color: deepPurple, fontWeight: FontWeight.bold, fontSize: 12),
                     ),
