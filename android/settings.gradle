@@ -5,6 +5,7 @@ pluginManagement {
         def flutterSdkPath = properties.getProperty("flutter.sdk")
         assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
         return flutterSdkPath
+        
     }()
 
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
@@ -13,6 +14,15 @@ pluginManagement {
         google()
         mavenCentral()
         gradlePluginPortal()
+    }
+    
+    // Add this resolution strategy
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id.startsWith('org.jetbrains.kotlin')) {
+                useVersion '1.9.0'
+            }
+        }
     }
 }
 

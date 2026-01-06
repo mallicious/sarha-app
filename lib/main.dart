@@ -1,93 +1,259 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'firebase_options.dart';
+import 'package:provider/provider.dart';
 
-// SCREENS
-import 'screen/splash_screen.dart';
+// Screens
 import 'screen/user_type_selection_screen.dart';
 import 'screen/login_screen.dart';
+import 'screen/responder_loginscreen.dart';
 import 'screen/registration_screen.dart';
 import 'screen/home_screen.dart';
-import 'screen/settings_screen.dart';
-import 'screen/edit_profilescreen.dart';
 import 'screen/responder_dashboard_screen.dart';
-import 'screen/responder_loginscreen.dart';
-import 'screen/responder_signupscreen.dart';
-import 'screen/admin_panelscreen.dart';
+import 'screen/edit_profilescreen.dart';
+import 'screen/settings_screen.dart';
+import 'screen/unified_detection_screen.dart';
 import 'screen/manual_reportscreen.dart';
-import 'screen/map_detectionscreen.dart';
-import 'screen/AR_hazardscreen.dart';
-import 'widgets/auth_gate.dart';
+import 'screen/ar_hazardscreen.dart';
+
+// Services
+import 'services/notification_services.dart';
+import 'services/analytics_services.dart';
+import 'services/ar_services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // Check Stay Logged In Status
-  final prefs = await SharedPreferences.getInstance();
-  final bool stayLoggedIn = prefs.getBool('stay_logged_in') ?? false;
-  final String? userType = prefs.getString('user_type'); // 'driver' or 'responder'
-
-if (stayLoggedIn) {
-  final now = DateTime.now().millisecondsSinceEpoch;
-  await prefs.setInt('loginTimestamp', now);
-  print('✅ Saved login state: stay=$stayLoggedIn, timestamp=$now');
+  
+  // Initialize Firebase
+  await Firebase.initializeApp();
+  
+  // Initialize Notifications
+  try {
+    await NotificationService().initialize();
+    print('✅ Notifications initialized');
+  } catch (e) {
+    print('⚠️ Notification initialization failed: $e');
+  }
+  
+  // Log app open
+  try {
+    await AnalyticsService().logAppOpen();
+    print('📊 Analytics initialized');
+  } catch (e) {
+    print('⚠️ Analytics failed: $e');
+  }
+  
+  runApp(const MyApp());
 }
 
-  runApp(SarhaApp(
-    initialRoute: stayLoggedIn ? _getHomeRoute(userType) : '/',
-  ));
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
 }
 
-String _getHomeRoute(String? type) {
-  if (type == 'responder') return '/responderDashboard';
-  return '/driverDashboard';
-}
+class _MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = ThemeMode.light;
 
-class SarhaApp extends StatelessWidget {
-  final String initialRoute;
-  const SarhaApp({super.key, required this.initialRoute});
+  @override
+  void initState() {
+    super.initState();
+    _loadTheme();
+  }
+
+  Future<void> _loadTheme() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isDark = prefs.getBool('darkMode') ?? false;
+      setState(() => _themeMode = isDark ? ThemeMode.dark : ThemeMode.light);
+    } catch (e) {
+      print('⚠️ Theme load error: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SARHA',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3C959B),
-          primary: const Color(0xFF3C959B),
-          secondary: const Color(0xFFDADE5B),
-          tertiary: const Color(0xFFF7AD97),
-          surface: const Color(0xFFF5F5F5),
-          brightness: Brightness.light,
+    return ChangeNotifierProvider(
+      create: (_) => ARService(),
+      child: MaterialApp(
+        title: 'SARHA',
+        debugShowCheckedModeBanner: false,
+        
+        // Theme Configuration
+        theme: _buildLightTheme(),
+        darkTheme: _buildDarkTheme(),
+        themeMode: _themeMode,
+        
+        // Initial Route
+        initialRoute: '/',
+        
+        // Route Configuration
+        routes: {
+          '/': (context) => const UserTypeSelectionScreen(),
+          '/userTypeSelection': (context) => const UserTypeSelectionScreen(),
+          '/driverLogin': (context) => const LoginScreen(),
+          '/responderLogin': (context) => const ResponderLoginScreen(),
+          '/driverSignup': (context) => const RegistrationScreen(),
+          '/home': (context) => const HomeScreen(),
+          '/driverDashboard': (context) => const HomeScreen(),
+          '/responderDashboard': (context) => const ResponderDashboardScreen(),
+          '/editProfile': (context) => const EditProfileScreen(),
+          '/settings': (context) => const SettingsScreen(),
+          '/unifiedDetection': (context) => const UnifiedDetectionScreen(),
+          '/manualReport': (context) => const ManualReportScreen(),
+          '/arHazard': (context) => const ARHazardScreen(),
+        },
+        
+        // Unknown Route Handler
+        onUnknownRoute: (settings) {
+          return MaterialPageRoute(
+            builder: (context) => const UserTypeSelectionScreen(),
+          );
+        },
+      ),
+    );
+  }
+
+  // Light Theme
+  ThemeData _buildLightTheme() {
+    const softLavender = Color(0xFFA7B5F4);
+    const coral = Color(0xFFFF9B85);
+    const cream = Color(0xFFFAF8F5);
+    const deepPurple = Color(0xFF4A4063);
+    const lightPurple = Color(0xFFD1D5F7);
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: const ColorScheme.light(
+        primary: softLavender,
+        secondary: coral,
+        background: cream,
+        surface: Colors.white,
+      ),
+      scaffoldBackgroundColor: cream,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: softLavender,
+        foregroundColor: deepPurple,
+        elevation: 0,
+        centerTitle: false,
+      ),
+      cardTheme: CardTheme(
+        color: Colors.white,
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
       ),
-      // If we are auto-logging in, we go straight to dashboard, otherwise Splash
-      initialRoute: initialRoute == '/' ? null : initialRoute,
-      home: initialRoute == '/' ? const SplashScreen() : null,
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: coral,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: softLavender,
+          side: const BorderSide(color: softLavender, width: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: lightPurple),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: lightPurple),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: softLavender, width: 2),
+        ),
+      ),
+    );
+  }
 
-      routes: {
-        '/authGate': (_) => const AuthGate(),
-        '/userTypeSelection': (_) => const UserTypeSelectionScreen(),
-        '/login': (_) => const LoginScreen(),
-        '/register': (_) => const RegistrationScreen(),
-        '/driverLogin': (_) => const LoginScreen(),
-        '/responderLogin': (_) => const ResponderLoginScreen(),
-        '/responderSignup': (_) => const ResponderSignupScreen(),
-        '/driverDashboard': (_) => const HomeScreen(),
-        '/responderDashboard': (_) => const ResponderDashboardScreen(),
-        '/adminPanel': (_) => const AdminPanelScreen(),
-        '/settings': (_) => const SettingsScreen(),
-        '/editProfile': (_) => const EditProfileScreen(),
-        '/manualReport': (_) => const ManualReportScreen(),
-        '/mapDetection': (_) => const MapDetectionScreen(),
-        '/arView': (_) => const ARHazardScreen(),
-      },
+  // Dark Theme
+  ThemeData _buildDarkTheme() {
+    const darkLavender = Color.fromARGB(255, 14, 20, 39);
+    const darkCoral = Color(0xFFE68A70);
+    const darkBackground = Color.fromARGB(255, 34, 22, 43);
+    const darkSurface = Color(0xFF2A2A3A);
+    const lightText = Color(0xFFE0E0E0);
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: const ColorScheme.dark(
+        primary: darkLavender,
+        secondary: darkCoral,
+        background: darkBackground,
+        surface: darkSurface,
+      ),
+      scaffoldBackgroundColor: darkBackground,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: darkSurface,
+        foregroundColor: lightText,
+        elevation: 0,
+        centerTitle: false,
+      ),
+      cardTheme: CardTheme(
+        color: darkSurface,
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: darkCoral,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: darkLavender,
+          side: const BorderSide(color: darkLavender, width: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: darkSurface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: darkLavender.withOpacity(0.3)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: darkLavender.withOpacity(0.3)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: darkLavender, width: 2),
+        ),
+      ),
     );
   }
 }

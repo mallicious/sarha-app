@@ -18,19 +18,18 @@ def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '
 def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0'
 
 android {
-    namespace "com.difrancesco.ar_flutter_plugin"
-    namespace "com.malvina.sarha_app"
+    namespace "com.malvina.sarha_app"  // Remove duplicate namespace
     compileSdkVersion 35
 
     ndkVersion flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17  // Changed to 17
+        targetCompatibility JavaVersion.VERSION_17  // Changed to 17
     }
 
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '17'  // Changed to 17
     }
 
     sourceSets {
@@ -39,7 +38,7 @@ android {
 
     defaultConfig {
         applicationId "com.malvina.sarha_app"
-        minSdkVersion 23
+        minSdkVersion 24
         targetSdkVersion 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
@@ -59,17 +58,4 @@ flutter {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
- 
-}
-subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
-            project.android {
-                if (namespace == null) {
-                    // This sets the namespace for plugins that are missing it
-                    namespace project.group
-                }
-            }
-        }
-    }
 }

@@ -3,7 +3,25 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/ar_hazards.dart';
+
+// Ensure this model exists or use a generic Map
+class ArHazard {
+  final String id;
+  final double lat;
+  final double lng;
+  final String type;
+
+  ArHazard({required this.id, required this.lat, required this.lng, required this.type});
+
+  factory ArHazard.fromFirestore(Map<String, dynamic> data, String id) {
+    return ArHazard(
+      id: id,
+      lat: data['latitude'] ?? 0.0,
+      lng: data['longitude'] ?? 0.0,
+      type: data['type'] ?? 'Unknown',
+    );
+  }
+}
 
 enum ARStatus { 
   initializing, 
@@ -28,15 +46,9 @@ class ARService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Check Camera/AR Permissions (Placeholder for AR-specific checks)
       await _checkARPermissions();
-
-      // 2. Fetch Near Hazards (Using Firestore and Geolocator)
       await _fetchNearbyHazards();
-      
-      // If all checks pass, set status to ready
       _status = ARStatus.cameraReady;
-      
     } catch (e) {
       if (e.toString().contains('denied')) {
         _status = ARStatus.permissionDenied;
@@ -49,16 +61,12 @@ class ARService extends ChangeNotifier {
   }
 
   Future<void> _checkARPermissions() async {
-    // We only rely on Geolocator permission for now
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
       throw Exception("Location permission denied.");
     }
-
-    // Simulate other AR setup time
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 1));
   }
-
 
   Future<void> _fetchNearbyHazards() async {
     try {
@@ -70,9 +78,8 @@ class ARService extends ChangeNotifier {
       _nearbyHazards = snapshot.docs.map((doc) => 
         ArHazard.fromFirestore(doc.data(), doc.id)
       ).toList();
-
     } catch (e) {
-       print("Failed to fetch hazards for AR: $e");
+       debugPrint("Failed to fetch hazards for AR: $e");
        throw Exception("Failed to fetch hazard data.");
     }
   }
