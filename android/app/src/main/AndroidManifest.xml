@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -15,9 +16,16 @@
         android:label="SARHA"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:requestLegacyExternalStorage="true"> <meta-data 
+        android:requestLegacyExternalStorage="true">
+        
+        <meta-data 
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyDtZeNKWv4QbFV0StMztNtxrF55TWxAdJI" />
+        
+        <meta-data 
+            android:name="com.google.ar.core" 
+            android:value="required"
+            tools:replace="android:value" />
 
         <activity
             android:name=".MainActivity"
@@ -38,6 +46,13 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ARActivity"
+            android:exported="false"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:screenOrientation="locked" />
 
         <meta-data
             android:name="flutterEmbedding"
