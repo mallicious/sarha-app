@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:io';
 import 'pick_location_screen.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class ManualReportScreen extends StatefulWidget {
   const ManualReportScreen({super.key});
@@ -106,62 +107,107 @@ class _ManualReportScreenState extends State<ManualReportScreen> {
   Widget _section(String t) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(t, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)));
 
   Widget _buildLocationInput() => Container(
-    decoration: BoxDecoration(color: lightGrey, borderRadius: BorderRadius.circular(16)),
-    child: TextField(
-      controller: _locationController,
-      onSubmitted: (_) => _searchAndConfirm(),
-      decoration: InputDecoration(
-        hintText: "Type address...",
-        prefixIcon: const Icon(Icons.search, color: primaryPurple),
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_isLocating)
-              const Padding(padding: EdgeInsets.symmetric(horizontal: 8.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple))),
-            IconButton(
-              icon: const Icon(Icons.check_circle, color: Colors.green),
-              onPressed: _searchAndConfirm,
-              tooltip: 'Confirm location',
-            ),
-            IconButton(
-              icon: const Icon(Icons.map_rounded, color: accentOrange),
-              onPressed: () async {
-                final res = await Navigator.push(context, MaterialPageRoute(builder: (context) => const PickLocationScreen()));
-                if (res != null) setState(() => _locationController.text = res['address']);
-              },
-              tooltip: 'Open map',
-            ),
-          ],
-        ),
-        border: InputBorder.none, contentPadding: const EdgeInsets.all(16),
-      ),
-    ),
-  );
+        decoration: BoxDecoration(color: lightGrey, borderRadius: BorderRadius.circular(16)),
+        child: TextField(
+          controller: _locationController,
+          onSubmitted: (_) => _searchAndConfirm(),
+          decoration: InputDecoration(
+            hintText: "Type address...",
+            prefixIcon: const Icon(Icons.search, color: primaryPurple),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isLocating)
+                  const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8.0),
+                      child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple))),
+                IconButton(
+                  icon: const Icon(Icons.check_circle, color: Colors.green),
+                  onPressed: _searchAndConfirm,
+                  tooltip: 'Confirm location',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.map_rounded, color: accentOrange),
+                  onPressed: () async {
+                    // We remove 'const' here because we are passing dynamic data
+                    final res = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PickLocationScreen(
+                          // This starts the map at a default location (Abuja)
+                          // but the user will only see the address name when they return.
+                          initialLocation: LatLng(9.0578, 7.4951), 
+                        ),
+                      ),
+                    );
 
-  Widget _buildGrid() => GridView.builder(
-    shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10),
-    itemCount: _hazardTypes.length,
-    itemBuilder: (context, i) {
-      bool sel = _selectedHazard == _hazardTypes[i]['name'];
-      return GestureDetector(
-        onTap: () => setState(() => _selectedHazard = _hazardTypes[i]['name']),
-        child: Container(
-          decoration: BoxDecoration(
-            color: sel ? primaryPurple : Colors.white, borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: sel ? primaryPurple : lightGrey, width: 2),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(_hazardTypes[i]['icon'], color: sel ? Colors.white : _hazardTypes[i]['color'], size: 28),
-              Text(_hazardTypes[i]['name'], style: TextStyle(color: sel ? Colors.white : Colors.black, fontSize: 11, fontWeight: FontWeight.bold)),
-            ],
+                    // When the user clicks 'CONFIRM' on the map, 
+                    // this grabs the 'address' string and puts it in your text box.
+                    if (res != null && res['address'] != null) {
+                      setState(() {
+                        _locationController.text = res['address'];
+                      });
+                    }
+                  },
+                  tooltip: 'Open map',
+                ),
+              ],
+            ),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.all(16),
           ),
         ),
       );
-    },
-  );
+
+  Widget _buildGrid() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _hazardTypes.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 1.1,
+      ),
+      itemBuilder: (context, index) {
+        final hazard = _hazardTypes[index];
+        final isSelected = _selectedHazard == hazard['name'];
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedHazard = hazard['name'];
+            });
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: isSelected ? hazard['color'].withOpacity(0.2) : lightGrey,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isSelected ? hazard['color'] : Colors.transparent,
+                width: 2,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(hazard['icon'], color: hazard['color'], size: 32),
+                const SizedBox(height: 8),
+                Text(
+                  hazard['name'],
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? hazard['color'] : Colors.black54,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildDescField() => TextField(
     controller: _descriptionController, maxLines: 3,

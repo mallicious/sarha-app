@@ -14,7 +14,8 @@ import 'screen/edit_profilescreen.dart';
 import 'screen/settings_screen.dart';
 import 'screen/unified_detection_screen.dart';
 import 'screen/manual_reportscreen.dart';
-import 'screen/ar_hazardscreen.dart';
+import 'screen/ar_hazard_simulation.dart';  // CHANGED: Using simulation instead
+
 
 // Services
 import 'services/notification_services.dart';
@@ -29,7 +30,7 @@ void main() async {
   
   // Initialize Notifications
   try {
-    await NotificationService().initialize();
+    await NotificationService.initialize();
     print('✅ Notifications initialized');
   } catch (e) {
     print('⚠️ Notification initialization failed: $e');
@@ -102,7 +103,7 @@ class _MyAppState extends State<MyApp> {
           '/settings': (context) => const SettingsScreen(),
           '/unifiedDetection': (context) => const UnifiedDetectionScreen(),
           '/manualReport': (context) => const ManualReportScreen(),
-          '/arHazard': (context) => const ARHazardScreen(),
+          '/arHazard': (context) => const ArHazardSimulation(),  // CHANGED: Using simulation
         },
         
         // Unknown Route Handler
@@ -129,7 +130,6 @@ class _MyAppState extends State<MyApp> {
       colorScheme: const ColorScheme.light(
         primary: softLavender,
         secondary: coral,
-        background: cream,
         surface: Colors.white,
       ),
       scaffoldBackgroundColor: cream,
@@ -200,7 +200,6 @@ class _MyAppState extends State<MyApp> {
       colorScheme: const ColorScheme.dark(
         primary: darkLavender,
         secondary: darkCoral,
-        background: darkBackground,
         surface: darkSurface,
       ),
       scaffoldBackgroundColor: darkBackground,

@@ -267,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.green[400]!,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ARHazardScreen()),
+                  MaterialPageRoute(builder: (context) => ARHazardScreen()),
                 ),
               ),
             ),
