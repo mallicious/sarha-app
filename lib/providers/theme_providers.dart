@@ -54,7 +54,7 @@ class ThemeProvider with ChangeNotifier {
         onSecondary: darkTeal,
         onSurface: darkTeal,
       ),
-      
+
       // AppBar Theme
       appBarTheme: const AppBarTheme(
         backgroundColor: primaryTeal,
@@ -69,7 +69,7 @@ class ThemeProvider with ChangeNotifier {
       ),
 
       // Card Theme
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 2,
         shape: RoundedRectangleBorder(
@@ -157,7 +157,7 @@ class ThemeProvider with ChangeNotifier {
       ),
 
       // Card Theme
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: const Color(0xFF2A2A2A),
         elevation: 4,
         shape: RoundedRectangleBorder(

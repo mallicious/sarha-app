@@ -53,7 +53,7 @@ class ThemeService {
         foregroundColor: _lightPalette['text'],
         elevation: 0,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 2,
         shape: RoundedRectangleBorder(
@@ -89,7 +89,7 @@ class ThemeService {
         foregroundColor: _darkPalette['text'],
         elevation: 0,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: _darkPalette['accent'],
         elevation: 2,
         shape: RoundedRectangleBorder(

@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:sarha_app/view/ar_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'unified_detection_screen.dart';
 import 'manual_reportscreen.dart';
-import 'AR_hazardscreen.dart';
 import 'settings_screen.dart';
 import 'user_type_selection_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,7 +41,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final locations = await locationFromAddress(address);
       if (locations.isNotEmpty) {
         setState(() {
-          _location = LatLng(locations.first.latitude, locations.first.longitude);
+          _location =
+              LatLng(locations.first.latitude, locations.first.longitude);
         });
       }
     } catch (e) {
@@ -62,7 +64,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1:
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const UnifiedDetectionScreen()),
+          MaterialPageRoute(
+              builder: (context) => const UnifiedDetectionScreen()),
         ).then((_) => setState(() => _currentIndex = 0));
         break;
       case 2:
@@ -74,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 3:
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const ARHazardScreen()),
+          MaterialPageRoute(builder: (context) =>  ARView()),  // ✅ FIXED!
         ).then((_) => setState(() => _currentIndex = 0));
         break;
     }
@@ -85,12 +88,13 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.remove('stayLoggedIn');
     await prefs.remove('loginTimestamp');
     await prefs.remove('userType');
-    
+
     await FirebaseAuth.instance.signOut();
-    
+
     if (context.mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const UserTypeSelectionScreen()),
+        MaterialPageRoute(
+            builder: (context) => const UserTypeSelectionScreen()),
         (route) => false,
       );
     }
@@ -187,7 +191,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icon(Icons.settings_rounded, color: deepPurple),
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const SettingsScreen()),
                 ),
               ),
               IconButton(
@@ -196,7 +201,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -243,7 +247,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: coral,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const UnifiedDetectionScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const UnifiedDetectionScreen()),
                 ),
               ),
             ),
@@ -255,7 +260,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: softLavender,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ManualReportScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const ManualReportScreen()),
                 ),
               ),
             ),
@@ -267,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.green[400]!,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => ARHazardScreen()),
+                  MaterialPageRoute(builder: (context) =>  ARView()),  // ✅ FIXED!
                 ),
               ),
             ),
@@ -446,7 +452,8 @@ class _HomeScreenState extends State<HomeScreen> {
             TextButton.icon(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const UnifiedDetectionScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const UnifiedDetectionScreen()),
               ),
               icon: const Icon(Icons.fullscreen_rounded, size: 18),
               label: const Text('View Full'),

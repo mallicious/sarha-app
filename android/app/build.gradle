@@ -17,29 +17,43 @@ if (localPropertiesFile.exists()) {
 def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '1'
 def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0'
 
+subprojects {
+    afterEvaluate { project ->
+        if (project.plugins.hasPlugin('com.android.library')) {
+            project.android {
+                compileSdkVersion 36
+                defaultConfig {
+                    minSdkVersion 24
+                }
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+            }
+        }
+    }
+}
+
 android {
-    namespace "com.malvina.sarha_app"  // Remove duplicate namespace
-    compileSdk 35
+    namespace "com.malvina.sarha_app"
+    compileSdk 36
 
     ndkVersion flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11  
-        targetCompatibility JavaVersion.VERSION_11  
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
     }
 
     kotlinOptions {
-        jvmTarget = '11'  // Changed to 17
-    }
-
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
+        jvmTarget = '17'
     }
 
     defaultConfig {
         applicationId "com.malvina.sarha_app"
         minSdkVersion 24
-        targetSdkVersion 34
+        targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
@@ -58,5 +72,5 @@ flutter {
 
 dependencies {
     implementation "androidx.appcompat:appcompat:1.6.1"
-    implementation "com.google.ar:core:1.44.0"
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
 }

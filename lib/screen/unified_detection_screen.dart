@@ -407,7 +407,7 @@ class _UnifiedDetectionScreenState extends State<UnifiedDetectionScreen> {
           if (!_showMap && _nearbyHazards.isNotEmpty)
             ..._nearbyHazards.asMap().entries.map((entry) {
               return _buildARHazardMarker(entry.value, entry.key);
-            }).toList(),
+            }),
 
           // Sensor Readings (when detecting)
           if (_isDetecting)
@@ -616,7 +616,7 @@ class _UnifiedDetectionScreenState extends State<UnifiedDetectionScreen> {
             children: [
               _buildSensorReading('Accel', _accelZ.toStringAsFixed(1), coral),
               _buildSensorReading('Gyro', _gyroZ.toStringAsFixed(2), softLavender),
-              _buildSensorReading('Speed', '${_currentSpeed.toStringAsFixed(0)}', Colors.green[300]!),
+              _buildSensorReading('Speed', _currentSpeed.toStringAsFixed(0), Colors.green[300]!),
             ],
           ),
         ],

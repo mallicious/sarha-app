@@ -1,10 +1,11 @@
-// lib/screen/main_navigation_screen.dart - FIXED DUPLICATE BUTTONS
+// lib/screen/main_navigation_screen.dart - FIXED WITH UNITY AR
 
 import 'package:flutter/material.dart';
+import 'package:sarha_app/view/ar_view.dart';
 import 'home_screen.dart';
 import 'map_detectionscreen.dart';
 import 'manual_reportscreen.dart';
-import 'AR_hazardscreen.dart';
+ 
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -17,10 +18,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
-    HomeScreen(),
-    MapDetectionScreen(),
-    ManualReportScreen(),
-    ARHazardScreen(),
+    const HomeScreen(),
+    const MapDetectionScreen(),
+    const ManualReportScreen(),
+     ARView(), // ✅ CHANGED!
   ];
 
   @override

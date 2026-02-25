@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'responder_loginscreen.dart';
-import 'home_screen.dart'; // ✅ Make sure this import exists
-import 'responder_dashboard_screen.dart';
-import 'login_screen.dart';
 
 class UserTypeSelectionScreen extends StatefulWidget {
   const UserTypeSelectionScreen({super.key});
 
   @override
-  State<UserTypeSelectionScreen> createState() => _UserTypeSelectionScreenState();
+  State<UserTypeSelectionScreen> createState() =>
+      _UserTypeSelectionScreenState();
 }
 
 class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
@@ -23,6 +20,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
 
   bool _isDriverPressed = false;
   bool _isResponderPressed = false;
+  bool _isCheckingLogin = true; // Add loading state
 
   @override
   void initState() {
@@ -31,57 +29,96 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
   }
 
   Future<void> _checkAutoLogin() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stayLoggedIn = prefs.getBool('stayLoggedIn') ?? false;
-    final userType = prefs.getString('userType');
-    final loginTimestamp = prefs.getInt('loginTimestamp');
-    
-    print('🔍 Auto-login check: stayLoggedIn=$stayLoggedIn, userType=$userType');
-    
-    if (!stayLoggedIn || userType == null) {
-      print('❌ No auto-login: stay=$stayLoggedIn, type=$userType');
-      return;
-    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stayLoggedIn = prefs.getBool('stayLoggedIn') ?? false;
+      final userType = prefs.getString('userType');
+      final loginTimestamp = prefs.getInt('loginTimestamp');
 
-    // Check if 2 weeks have passed
-    if (loginTimestamp != null) {
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final twoWeeksInMs = 14 * 24 * 60 * 60 * 1000;
-      
-      if (now - loginTimestamp > twoWeeksInMs) {
-        print('⏰ Login expired (>2 weeks)');
-        await prefs.remove('stayLoggedIn');
-        await prefs.remove('loginTimestamp');
+      print(
+          '🔍 Auto-login check: stayLoggedIn=$stayLoggedIn, userType=$userType');
+
+      // Check if user wants to stay logged in
+      if (!stayLoggedIn || userType == null) {
+        print('❌ No auto-login requested');
+        setState(() => _isCheckingLogin = false);
         return;
       }
-    }
 
-    // Check if user is actually logged into Firebase
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null && mounted) {
-      print('✅ Auto-login successful! Navigating to $userType dashboard');
-      
-      // Small delay to show splash/logo
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      if (userType == 'driver') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()), // Make sure HomeScreen class exists in home_screen.dart
-        );
-      } else if (userType == 'responder') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const ResponderDashboardScreen()),
-        );
+      // Check if 2 weeks have passed
+      if (loginTimestamp != null) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final twoWeeksInMs = 14 * 24 * 60 * 60 * 1000;
+
+        if (now - loginTimestamp > twoWeeksInMs) {
+          print('⏰ Login expired (>2 weeks)');
+          await prefs.remove('stayLoggedIn');
+          await prefs.remove('loginTimestamp');
+          setState(() => _isCheckingLogin = false);
+          return;
+        }
       }
-    } else {
-      print('❌ No Firebase user found');
+
+      // Check if user is actually logged into Firebase
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && mounted) {
+        print('✅ Auto-login successful! Navigating to $userType dashboard');
+
+        // Navigate based on user type
+        if (userType == 'driver') {
+          Navigator.pushReplacementNamed(context, '/home');
+        } else if (userType == 'responder') {
+          Navigator.pushReplacementNamed(context, '/responderDashboard');
+        }
+      } else {
+        print('❌ No Firebase user found');
+        setState(() => _isCheckingLogin = false);
+      }
+    } catch (e) {
+      print('⚠️ Auto-login error: $e');
+      setState(() => _isCheckingLogin = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading while checking auto-login
+    if (_isCheckingLogin) {
+      return Scaffold(
+        backgroundColor: cream,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(30),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [softLavender, lightPurple],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.warning_amber_rounded,
+                    size: 80, color: Colors.white),
+              ),
+              const SizedBox(height: 30),
+              const CircularProgressIndicator(color: softLavender),
+              const SizedBox(height: 20),
+              Text(
+                'Loading...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: deepPurple.withOpacity(0.6),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: cream,
       body: SafeArea(
@@ -108,21 +145,26 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.warning_amber_rounded, size: 80, color: Colors.white),
+                child: const Icon(Icons.warning_amber_rounded,
+                    size: 80, color: Colors.white),
               ),
 
               const SizedBox(height: 40),
 
               const Text(
                 'Welcome to SARHA',
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: deepPurple),
+                style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: deepPurple),
               ),
 
               const SizedBox(height: 10),
 
               Text(
                 'Choose your account type to proceed',
-                style: TextStyle(fontSize: 16, color: deepPurple.withOpacity(0.6)),
+                style:
+                    TextStyle(fontSize: 16, color: deepPurple.withOpacity(0.6)),
               ),
 
               const SizedBox(height: 50),
@@ -137,7 +179,8 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
                 onTapCancel: () => setState(() => _isDriverPressed = false),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 100),
-                  transform: Matrix4.identity()..translate(0.0, _isDriverPressed ? 4.0 : 0.0),
+                  transform: Matrix4.identity()
+                    ..translate(0.0, _isDriverPressed ? 4.0 : 0.0),
                   child: _buildUserTypeButton(
                     icon: Icons.directions_car_filled_rounded,
                     title: 'Driver',
@@ -161,7 +204,8 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
                 onTapCancel: () => setState(() => _isResponderPressed = false),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 100),
-                  transform: Matrix4.identity()..translate(0.0, _isResponderPressed ? 4.0 : 0.0),
+                  transform: Matrix4.identity()
+                    ..translate(0.0, _isResponderPressed ? 4.0 : 0.0),
                   child: _buildUserTypeButton(
                     icon: Icons.engineering_rounded,
                     title: 'Road Authority',
@@ -176,19 +220,23 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
               const SizedBox(height: 40),
 
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: lightPurple.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(30),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.security_rounded, color: deepPurple, size: 18),
-                    const SizedBox(width: 8),
-                    const Text(
+                    Icon(Icons.security_rounded, color: deepPurple, size: 18),
+                    SizedBox(width: 8),
+                    Text(
                       'Secure Roadside Monitoring',
-                      style: TextStyle(color: deepPurple, fontWeight: FontWeight.bold, fontSize: 12),
+                      style: TextStyle(
+                          color: deepPurple,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12),
                     ),
                   ],
                 ),
@@ -239,12 +287,16 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: textColor),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: TextStyle(fontSize: 13, color: textColor.withOpacity(0.9)),
+                  style: TextStyle(
+                      fontSize: 13, color: textColor.withOpacity(0.9)),
                 ),
               ],
             ),
@@ -255,22 +307,11 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen> {
     );
   }
 
-  void _handleNavigation(String userType) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('userType', userType);
-    await prefs.setBool('stayLoggedIn', false);
-    await prefs.remove('loginTimestamp');
-
+  void _handleNavigation(String userType) {
     if (userType == 'driver') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+      Navigator.pushNamed(context, '/driverLogin');
     } else if (userType == 'responder') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ResponderLoginScreen()),
-      );
+      Navigator.pushNamed(context, '/responderLogin');
     }
   }
 }

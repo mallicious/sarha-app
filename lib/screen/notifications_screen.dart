@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({Key? key}) : super(key: key);
+  const NotificationsScreen({super.key});
 
   @override
   State createState() => _NotificationsScreenState();
@@ -31,7 +31,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           return ListView.builder(
             itemCount: notifications.length,
             itemBuilder: (context, index) {
-              final notif = notifications[index].data() as Map<String, dynamic>;
+              final notif = notifications[index].data();
               return Card(
                 margin: const EdgeInsets.all(8),
                 child: ListTile(

@@ -14,20 +14,21 @@ import 'screen/edit_profilescreen.dart';
 import 'screen/settings_screen.dart';
 import 'screen/unified_detection_screen.dart';
 import 'screen/manual_reportscreen.dart';
-import 'screen/ar_hazard_simulation.dart';  // CHANGED: Using simulation instead
-
 
 // Services
 import 'services/notification_services.dart';
 import 'services/analytics_services.dart';
 import 'services/ar_services.dart';
 
+//View
+import 'view/ar_view.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Firebase
   await Firebase.initializeApp();
-  
+
   // Initialize Notifications
   try {
     await NotificationService.initialize();
@@ -35,7 +36,7 @@ void main() async {
   } catch (e) {
     print('⚠️ Notification initialization failed: $e');
   }
-  
+
   // Log app open
   try {
     await AnalyticsService().logAppOpen();
@@ -43,7 +44,7 @@ void main() async {
   } catch (e) {
     print('⚠️ Analytics failed: $e');
   }
-  
+
   runApp(const MyApp());
 }
 
@@ -80,15 +81,15 @@ class _MyAppState extends State<MyApp> {
       child: MaterialApp(
         title: 'SARHA',
         debugShowCheckedModeBanner: false,
-        
+
         // Theme Configuration
         theme: _buildLightTheme(),
         darkTheme: _buildDarkTheme(),
         themeMode: _themeMode,
-        
+
         // Initial Route
         initialRoute: '/',
-        
+
         // Route Configuration
         routes: {
           '/': (context) => const UserTypeSelectionScreen(),
@@ -102,10 +103,10 @@ class _MyAppState extends State<MyApp> {
           '/editProfile': (context) => const EditProfileScreen(),
           '/settings': (context) => const SettingsScreen(),
           '/unifiedDetection': (context) => const UnifiedDetectionScreen(),
-          '/manualReport': (context) => const ManualReportScreen(),
-          '/arHazard': (context) => const ArHazardSimulation(),  // CHANGED: Using simulation
+          '/manualReport': (context) => ManualReportScreen(),
+          '/arHazard': (context) => ARView(),
         },
-        
+
         // Unknown Route Handler
         onUnknownRoute: (settings) {
           return MaterialPageRoute(
@@ -139,7 +140,7 @@ class _MyAppState extends State<MyApp> {
         elevation: 0,
         centerTitle: false,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 2,
         shape: RoundedRectangleBorder(
@@ -209,7 +210,7 @@ class _MyAppState extends State<MyApp> {
         elevation: 0,
         centerTitle: false,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: darkSurface,
         elevation: 2,
         shape: RoundedRectangleBorder(

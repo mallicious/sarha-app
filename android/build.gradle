@@ -1,43 +1,20 @@
-buildscript {
-    ext.kotlin_version = '1.7.10'
+allprojects {
     repositories {
         google()
         mavenCentral()
     }
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
 }
 
-apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
+rootProject.buildDir = "../build"
 
-android {
-    namespace "com.difrancescogianmarco.arcore_flutter_plugin"
-    compileSdkVersion 33
-
-    defaultConfig {
-        minSdkVersion 24
-        targetSdkVersion 33
-        versionCode 1
-        versionName "1.0"
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = '1.8'
-    }
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
 
-repositories {
-    google()
-    mavenCentral()
+subprojects {
+    project.evaluationDependsOn(":app")
 }
 
-dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
 }
