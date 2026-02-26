@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
@@ -26,10 +27,8 @@ import 'view/ar_view.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
   await Firebase.initializeApp();
 
-  // Initialize Notifications
   try {
     await NotificationService.initialize();
     print('✅ Notifications initialized');
@@ -37,7 +36,6 @@ void main() async {
     print('⚠️ Notification initialization failed: $e');
   }
 
-  // Log app open
   try {
     await AnalyticsService().logAppOpen();
     print('📊 Analytics initialized');
@@ -81,18 +79,43 @@ class _MyAppState extends State<MyApp> {
       child: MaterialApp(
         title: 'SARHA',
         debugShowCheckedModeBanner: false,
-
-        // Theme Configuration
         theme: _buildLightTheme(),
         darkTheme: _buildDarkTheme(),
         themeMode: _themeMode,
 
-        // Initial Route
-        initialRoute: '/',
+        // ✅ PERSISTENT LOGIN: Check auth state on every app open
+        home: StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          builder: (context, snapshot) {
+            // Still connecting to Firebase
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const _SplashScreen();
+            }
 
-        // Route Configuration
+            // User is logged in
+            if (snapshot.hasData && snapshot.data != null) {
+              return FutureBuilder<SharedPreferences>(
+                future: SharedPreferences.getInstance(),
+                builder: (context, prefsSnapshot) {
+                  if (!prefsSnapshot.hasData) return const _SplashScreen();
+
+                  final userType =
+                      prefsSnapshot.data!.getString('userType') ?? 'driver';
+
+                  if (userType == 'responder') {
+                    return const ResponderDashboardScreen();
+                  }
+                  return const HomeScreen();
+                },
+              );
+            }
+
+            // Not logged in - show selection screen
+            return const UserTypeSelectionScreen();
+          },
+        ),
+
         routes: {
-          '/': (context) => const UserTypeSelectionScreen(),
           '/userTypeSelection': (context) => const UserTypeSelectionScreen(),
           '/driverLogin': (context) => const LoginScreen(),
           '/responderLogin': (context) => const ResponderLoginScreen(),
@@ -107,7 +130,6 @@ class _MyAppState extends State<MyApp> {
           '/arHazard': (context) => ARView(),
         },
 
-        // Unknown Route Handler
         onUnknownRoute: (settings) {
           return MaterialPageRoute(
             builder: (context) => const UserTypeSelectionScreen(),
@@ -117,7 +139,6 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
-  // Light Theme
   ThemeData _buildLightTheme() {
     const softLavender = Color(0xFFA7B5F4);
     const coral = Color(0xFFFF9B85);
@@ -187,7 +208,6 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
-  // Dark Theme
   ThemeData _buildDarkTheme() {
     const darkLavender = Color.fromARGB(255, 14, 20, 39);
     const darkCoral = Color(0xFFE68A70);
@@ -252,6 +272,47 @@ class _MyAppState extends State<MyApp> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: darkLavender, width: 2),
+        ),
+      ),
+    );
+  }
+}
+
+// Simple splash screen shown while checking auth state
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFFFAF8F5),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.directions_car_rounded,
+                size: 80, color: Color(0xFFA7B5F4)),
+            SizedBox(height: 24),
+            Text(
+              'SARHA',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4A4063),
+                letterSpacing: 4,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Smart Assist for Road Hazard Alerting',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF4A4063),
+              ),
+            ),
+            SizedBox(height: 40),
+            CircularProgressIndicator(color: Color(0xFFFF9B85)),
+          ],
         ),
       ),
     );

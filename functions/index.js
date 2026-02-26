@@ -7,86 +7,90 @@ const geofireCommon = require("geofire-common");
 initializeApp();
 
 exports.sendNotificationToNearbyResponders = onDocumentCreated(
-    "reports/{reportId}",
+    "hazards/{hazardId}",  // ✅ FIXED: was "reports/{reportId}"
     async (event) => {
         try {
-            const reportData = event.data.data();
-            const reportId = event.params.reportId;
+            const hazardData = event.data.data();
+            const hazardId = event.params.hazardId;
 
-            console.log("🚨 New hazard reported:", reportId);
-            console.log("📍 Hazard data:", reportData);
+            console.log("🚨 New hazard detected:", hazardId);
+            console.log("📍 Hazard data:", hazardData);
 
-            if (!reportData.location ||
-                !reportData.location.latitude ||
-                !reportData.location.longitude) {
-                console.error("❌ No valid location in report");
+            // ✅ FIXED: fields are top-level, not nested under location
+            if (!hazardData.latitude || !hazardData.longitude) {
+                console.error("❌ No valid location in hazard");
                 return null;
             }
 
-            const hazardLat = reportData.location.latitude;
-            const hazardLng = reportData.location.longitude;
-            const hazardType = reportData.hazardType || "Road Hazard";
+            const hazardLat = hazardData.latitude;
+            const hazardLng = hazardData.longitude;
+            const hazardType = hazardData.type || "Road Hazard";
+            const description = hazardData.description || "Hazard detected nearby";
 
-            console.log(`📍 Hazard: ${hazardLat}, ${hazardLng}`);
+            console.log(`📍 Hazard location: ${hazardLat}, ${hazardLng}`);
+            console.log(`🚨 Type: ${hazardType}`);
 
             const RADIUS_KM = 5;
             const RADIUS_M = RADIUS_KM * 1000;
 
             const db = getFirestore();
+
+            // Notify responders
+            const respondersSnapshot = await db.collection("responders").get();
+            // Also notify nearby users
             const usersSnapshot = await db.collection("users").get();
 
-            if (usersSnapshot.empty) {
-                console.log("👥 No users found");
+            const allDocs = [...respondersSnapshot.docs, ...usersSnapshot.docs];
+
+            if (allDocs.length === 0) {
+                console.log("👥 No users or responders found");
                 return null;
             }
 
-            console.log(`👥 Total users: ${usersSnapshot.size}`);
+            console.log(`👥 Total people to check: ${allDocs.length}`);
 
             const notifications = [];
             let nearbyCount = 0;
 
-            for (const userDoc of usersSnapshot.docs) {
-                const userData = userDoc.data();
+            for (const doc of allDocs) {
+                const userData = doc.data();
 
                 if (!userData.fcmToken) {
-                    console.log(`⚠️ User ${userDoc.id} no token`);
+                    console.log(`⚠️ ${doc.id} has no FCM token`);
                     continue;
                 }
 
-                if (!userData.location ||
-                    !userData.location.latitude ||
-                    !userData.location.longitude) {
-                    console.log(`⚠️ User ${userDoc.id} no location`);
-                    continue;
+                // Responders get notified regardless of location
+                const isResponder = respondersSnapshot.docs.some(r => r.id === doc.id);
+
+                let shouldNotify = isResponder; // Always notify responders
+
+                // For regular users, check distance
+                if (!isResponder && userData.latitude && userData.longitude) {
+                    const distanceInM = geofireCommon.distanceBetween(
+                        [hazardLat, hazardLng],
+                        [userData.latitude, userData.longitude],
+                    ) * 1000;
+
+                    console.log(`📏 User ${doc.id} is ${distanceInM.toFixed(0)}m away`);
+                    shouldNotify = distanceInM <= RADIUS_M;
                 }
 
-                const userLat = userData.location.latitude;
-                const userLng = userData.location.longitude;
-
-                const distanceInM = geofireCommon.distanceBetween(
-                    [hazardLat, hazardLng],
-                    [userLat, userLng],
-                ) * 1000;
-
-                const distStr = distanceInM.toFixed(0);
-                console.log(`📏 User ${userDoc.id} is ${distStr}m away`);
-
-                if (distanceInM <= RADIUS_M) {
+                if (shouldNotify) {
                     nearbyCount++;
-                    const distKm = (distanceInM / 1000).toFixed(1);
 
                     notifications.push({
                         token: userData.fcmToken,
                         notification: {
-                            title: "🚨 New Road Hazard Alert",
-                            body: `${hazardType} reported ${distKm}km away`,
+                            title: `🚨 ${hazardType} Detected`,
+                            body: description,
                         },
                         data: {
-                            reportId: reportId,
+                            hazardId: hazardId,
                             hazardType: hazardType,
                             latitude: hazardLat.toString(),
                             longitude: hazardLng.toString(),
-                            distance: distanceInM.toFixed(0),
+                            type: "hazard_alert",
                         },
                         android: {
                             priority: "high",
@@ -95,33 +99,48 @@ exports.sendNotificationToNearbyResponders = onDocumentCreated(
                                 channelId: "hazard_alerts",
                             },
                         },
+                        apns: {
+                            payload: {
+                                aps: {
+                                    sound: "default",
+                                    badge: 1,
+                                },
+                            },
+                        },
                     });
 
-                    console.log(`✅ Queued for ${userDoc.id}`);
+                    console.log(`✅ Queued notification for ${doc.id}`);
                 }
             }
 
-            console.log(`📤 Sending ${notifications.length} notifications`);
+            console.log(`📤 Sending ${notifications.length} notifications...`);
 
             if (notifications.length > 0) {
                 const messaging = getMessaging();
                 const response = await messaging.sendEach(notifications);
 
-                console.log(`✅ Sent ${response.successCount}`);
-                console.log(`❌ Failed ${response.failureCount}`);
+                console.log(`✅ Successfully sent: ${response.successCount}`);
+                console.log(`❌ Failed: ${response.failureCount}`);
+
+                // Log any failures
+                response.responses.forEach((resp, idx) => {
+                    if (!resp.success) {
+                        console.error(`❌ Failed for token ${idx}:`, resp.error);
+                    }
+                });
 
                 return {
                     success: true,
                     totalSent: response.successCount,
                     totalFailed: response.failureCount,
-                    nearbyUsers: nearbyCount,
+                    nearbyPeople: nearbyCount,
                 };
             } else {
-                console.log("⚠️ No nearby users within 5km");
+                console.log("⚠️ No nearby users or responders to notify");
                 return {success: true, message: "No nearby users"};
             }
         } catch (error) {
-            console.error("❌ Error:", error);
+            console.error("❌ Cloud Function error:", error);
             return {success: false, error: error.message};
         }
     },
